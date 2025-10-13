@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+/// App data models
+
+model Shop {
+  id              String   @id @default(cuid())
+  myshopifyDomain String   @unique
+  accessToken     String
+  plan            String   @default("basic")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  feeds           Feed[]
+}
+
+model Feed {
+  id            String   @id @default(cuid())
+  shopId        String
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  name          String
+  title         String?  // Display title for the feed
+  channel       String   // e.g., "google"
+  type          String   // e.g., "products"
+  language      String   // ISO 639-1 (e.g., "en", "pl", "es")
+  country       String   // ISO 3166-1 alpha-2 (e.g., "US", "PL", "ES")
+  currency      String   // "local" or currency code (e.g., "USD", "EUR")
+  fileType      String   // e.g., "xml"
+  timezone      String
+  locationId    String?  // Shopify location ID for inventory
+  targetMarkets String[]
+  status        String   @default("idle") // idle|running|success|error
+  lastRunAt     DateTime?
+  lastSuccessAt DateTime?
+  lastError     String?
+  publicPath    String   // object storage key
+  publicUrl     String   // CDN/public URL
+  token         String   // access token for redirect route
+  productCount  Int      @default(0) // number of products in feed
+  variantCount  Int      @default(0) // number of variants in feed
+  settings      Json?    // Additional settings for language-specific configurations
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  mappings  FeedMapping[]
+  filters   FeedFilter[]
+  schedules FeedSchedule[]
+  runs      FeedRun[]
+  assets    FeedAsset[]
+}
+
+model FeedMapping {
+  id        String @id @default(cuid())
+  feedId    String
+  feed      Feed   @relation(fields: [feedId], references: [id])
+  targetKey String  // e.g., g:id
+  method    String  // shopifyField | constant | rule
+  value     String  // field path or constant
+  ruleJson  String?
+  order     Int
+}
+
+model FeedFilter {
+  id       String @id @default(cuid())
+  feedId   String
+  feed     Feed   @relation(fields: [feedId], references: [id])
+  scope    String // product | variant
+  field    String
+  operator String // equals|not_equals|contains|gt|gte|lt|lte|in|not_in|exists
+  value    String?
+  group    Int    @default(0)
+}
+
+model FeedSchedule {
+  id      String  @id @default(cuid())
+  feedId  String
+  feed    Feed    @relation(fields: [feedId], references: [id])
+  cron    String
+  enabled Boolean @default(true)
+}
+
+model FeedRun {
+  id           String   @id @default(cuid())
+  feedId       String
+  feed         Feed     @relation(fields: [feedId], references: [id])
+  startedAt    DateTime @default(now())
+  finishedAt   DateTime?
+  status       String   @default("running") // running|success|error
+  error        String?
+  productCount Int      @default(0)
+  variantCount Int      @default(0)
+  bytes        Int      @default(0)
+}
+
+// Optional: store XML snapshots in Neon (e.g., for backups or versioning)
+model FeedAsset {
+  id          String   @id @default(cuid())
+  feedId      String
+  feed        Feed     @relation(fields: [feedId], references: [id])
+  version     Int      @default(1)
+  content     Bytes?   // gzipped bytes
+  contentText String?  // plain text XML (not recommended for large feeds)
+  isGzip      Boolean  @default(true)
+  sizeBytes   Int
+  checksum    String
+  contentType String   @default("application/xml; charset=utf-8")
+  createdAt   DateTime @default(now())
+
+  @@index([feedId, version])
+}

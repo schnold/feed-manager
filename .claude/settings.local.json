@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(docker:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm test)",
+      "Bash(del:*)",
+      "Bash(rm:*)",
+      "Bash(npm run prisma:*)",
+      "Bash(npm run dev:*)",
+      "Bash(rg:*)",
+      "Bash(node:*)",
+      "WebSearch",
+      "Bash(npx prisma generate:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(powershell:*)"
+    ],
+    "deny": []
+  }
+}
