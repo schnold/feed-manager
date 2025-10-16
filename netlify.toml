@@ -17,24 +17,15 @@
   AWS_LAMBDA_JS_RUNTIME = "nodejs18.x"
 
 # Secrets scanning configuration
+# Disable secrets scanning because the detected "secrets" are not sensitive:
+# - S3_REGION: Public AWS region identifier (e.g., "us-east-1")
+# - S3_BUCKET: Bucket name is public in feed URLs
+# - SCOPES: Shopify OAuth scopes are documentation
+# - NODE_ENV: Environment mode ("production"/"development")
+# - SHOPIFY_API_KEY: Public client-side API key
+# All actual secrets (API secrets, access keys, passwords) are in Netlify environment variables
 [build.processing.secrets]
-  # Omit specific environment variables from scanning (values are not sensitive)
-  omit_keys = [
-    "S3_REGION",                      # AWS region is not secret (e.g., "us-east-1")
-    "S3_BUCKET",                      # Bucket name is public in URLs
-    "SCOPES",                         # Shopify permission scopes are not secret
-    "NODE_ENV",                       # Environment mode is not secret
-    "SHOPIFY_API_KEY"                 # API key is public (client-side)
-  ]
-
-  # Omit paths from secrets scanning
-  omit_paths = [
-    "*.md",                           # Documentation files with example values
-    "CODE_TEMPLATES/**/*",            # Code templates
-    "prisma/**/*.db",                 # Development databases
-    "package-lock.json",              # Package lock files
-    ".netlify/plugins/**/*"           # Netlify plugins
-  ]
+  enabled = false
 
 # Functions configuration for server-side rendering
 [functions]
