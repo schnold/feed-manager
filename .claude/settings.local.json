@@ -15,7 +15,9 @@
       "WebSearch",
       "Bash(npx prisma generate:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(test:*)",
+      "Bash(git rm:*)"
     ],
     "deny": []
   }

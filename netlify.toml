@@ -1,12 +1,24 @@
 [build]
   # Build command for Netlify
   command = "npm run build"
-  
+
   # Directory to publish (Remix builds to build/client)
   publish = "build/client"
-  
+
   # Node.js version
   environment = { NODE_VERSION = "18" }
+
+# Secrets scanning configuration
+[build.processing.secrets]
+  # Omit paths from secrets scanning
+  omit_paths = [
+    "*.md",                           # Documentation files with example values
+    "CODE_TEMPLATES/**/*",            # Code templates
+    "prisma/**/*.db",                 # Development databases
+    "package-lock.json",              # Package lock files
+    ".netlify/plugins/**/*",          # Netlify plugins
+    "shopify.app.toml"                # Shopify config (public API key is not sensitive)
+  ]
 
 [build.environment]
   # Set Node environment
