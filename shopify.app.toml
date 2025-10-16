@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "8ef1801073554bef93ef6153cd8e9981"
+client_id = "$SHOPIFY_API_KEY"
 name = "feed-manager"
 handle = "feed-manager-2"
 application_url = "https://to-adapters-broken-macro.trycloudflare.com"

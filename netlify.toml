@@ -20,6 +20,12 @@
   # (S3_REGION, S3_BUCKET, SCOPES, NODE_ENV, SHOPIFY_API_KEY are all public values)
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
+  # Omit non-sensitive environment variable names from secrets scanning
+  SECRETS_SCAN_OMIT_KEYS = "S3_REGION,S3_BUCKET,NODE_ENV,SCOPES,SHOPIFY_API_KEY"
+
+  # Omit build output and lock files from secrets scanning
+  SECRETS_SCAN_OMIT_PATHS = "build/**,**/package-lock.json,**/.netlify/**"
+
 # Functions configuration for server-side rendering
 [functions]
   # Directory for Netlify Functions
