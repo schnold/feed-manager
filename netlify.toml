@@ -5,8 +5,16 @@
   # Directory to publish (Remix builds to build/client)
   publish = "build/client"
 
+# Build environment variables
+[build.environment]
   # Node.js version
-  environment = { NODE_VERSION = "18" }
+  NODE_VERSION = "18"
+
+  # Set Node environment
+  NODE_ENV = "production"
+
+  # Enable Node.js functions
+  AWS_LAMBDA_JS_RUNTIME = "nodejs18.x"
 
 # Secrets scanning configuration
 [build.processing.secrets]
@@ -19,13 +27,6 @@
     ".netlify/plugins/**/*",          # Netlify plugins
     "shopify.app.toml"                # Shopify config (public API key is not sensitive)
   ]
-
-[build.environment]
-  # Set Node environment
-  NODE_ENV = "production"
-  
-  # Enable Node.js functions
-  AWS_LAMBDA_JS_RUNTIME = "nodejs18.x"
 
 # Functions configuration for server-side rendering
 [functions]
