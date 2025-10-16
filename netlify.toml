@@ -18,14 +18,22 @@
 
 # Secrets scanning configuration
 [build.processing.secrets]
+  # Omit specific environment variables from scanning (values are not sensitive)
+  omit_keys = [
+    "S3_REGION",                      # AWS region is not secret (e.g., "us-east-1")
+    "S3_BUCKET",                      # Bucket name is public in URLs
+    "SCOPES",                         # Shopify permission scopes are not secret
+    "NODE_ENV",                       # Environment mode is not secret
+    "SHOPIFY_API_KEY"                 # API key is public (client-side)
+  ]
+
   # Omit paths from secrets scanning
   omit_paths = [
     "*.md",                           # Documentation files with example values
     "CODE_TEMPLATES/**/*",            # Code templates
     "prisma/**/*.db",                 # Development databases
     "package-lock.json",              # Package lock files
-    ".netlify/plugins/**/*",          # Netlify plugins
-    "shopify.app.toml"                # Shopify config (public API key is not sensitive)
+    ".netlify/plugins/**/*"           # Netlify plugins
   ]
 
 # Functions configuration for server-side rendering
