@@ -1,0 +1,69 @@
+[build]
+  # Build command for Netlify
+  command = "npm run build"
+  
+  # Directory to publish (Remix builds to build/client)
+  publish = "build/client"
+  
+  # Node.js version
+  environment = { NODE_VERSION = "18" }
+
+[build.environment]
+  # Set Node environment
+  NODE_ENV = "production"
+  
+  # Enable Node.js functions
+  AWS_LAMBDA_JS_RUNTIME = "nodejs18.x"
+
+# Functions configuration for server-side rendering
+[functions]
+  # Directory for Netlify Functions
+  directory = "netlify/functions"
+  
+  # Node.js version for functions
+  node_bundler = "esbuild"
+
+# Redirects for Remix routing
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/remix"
+  status = 200
+
+# Headers for security and performance
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# Cache static assets
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# API routes
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/remix"
+  status = 200
+
+# Webhook routes
+[[redirects]]
+  from = "/webhooks/*"
+  to = "/.netlify/functions/remix"
+  status = 200
+
+# Auth routes
+[[redirects]]
+  from = "/auth/*"
+  to = "/.netlify/functions/remix"
+  status = 200
+
+# Feed XML routes
+[[redirects]]
+  from = "/feeds/*.xml"
+  to = "/.netlify/functions/remix"
+  status = 200

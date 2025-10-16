@@ -20,7 +20,9 @@
     "shopify": "shopify",
     "prisma": "prisma",
     "graphql-codegen": "graphql-codegen",
-    "vite": "vite"
+    "vite": "vite",
+    "netlify:build": "npm run setup && npm run build",
+    "netlify:dev": "netlify dev"
   },
   "type": "module",
   "engines": {
@@ -52,6 +54,7 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "@netlify/remix-adapter": "^2.0.0",
     "@remix-run/eslint-config": "^2.16.1",
     "@remix-run/route-config": "^2.16.1",
     "@shopify/api-codegen-preset": "^1.1.1",
@@ -63,6 +66,7 @@
     "eslint": "^8.42.0",
     "eslint-config-prettier": "^10.0.1",
     "jsdom": "^26.1.0",
+    "netlify-cli": "^17.0.0",
     "prettier": "^3.2.4",
     "tsx": "^4.20.4",
     "typescript": "^5.2.2",
