@@ -250,7 +250,7 @@ function InfoPanel({ feed }: { feed: any }) {
           <Card>
             <div style={{ padding: "16px" }}>
               <Text variant="headingSm" as="h3" style={{ marginBottom: "16px" }}>Help</Text>
-              <Text as="p">Need help adding a new feed? Contact us at hello@ondigital.io</Text>
+              <Text as="p">Need help adding a new feed? Contact us at hi@letsgolukas.com</Text>
             </div>
           </Card>
         </div>

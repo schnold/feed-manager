@@ -1,19 +1,24 @@
 import db from "../../db.server";
 import { uploadXmlToS3 } from "../storage/s3.server";
 import { iterateProducts } from "./product-iterator.server";
+import { iterateProductsWithStorefront, getStorefrontAccessToken } from "./storefront-product-iterator.server";
 import { defaultGoogleMapping } from "./mapping.server";
 import { passesFilters } from "./filters.server";
+import { getCurrencyForCountry } from "../currency/currency-converter.server";
+import { fetchTranslatedProductsAdmin } from "./translation-fetcher.server";
 
 type GenerateOptions = {
   feedId: string;
   shopDomain: string;
   accessToken: string;
+  request?: Request;
 };
 
 export async function generateGoogleXmlAndUpload({
   feedId,
   shopDomain,
-  accessToken
+  accessToken,
+  request
 }: GenerateOptions) {
   console.log(`[Feed Generation] Starting generation for feed ${feedId}`);
 
@@ -32,22 +37,70 @@ export async function generateGoogleXmlAndUpload({
   let productCount = 0;
   let variantCount = 0;
 
-  // Fetch all products using product iterator with the provided credentials
+  // Fetch all products using the best available API
   let products: any[] = [];
+  let translations = new Map();
 
-  const iter = iterateProducts({
-    shopDomain: shopDomain,
-    accessToken: accessToken,
-    language: feed.language,
-    country: feed.country,
-  });
+  try {
+    // Try Storefront API first (better for translations and localized pricing)
+    const storefrontAccessToken = await getStorefrontAccessToken(shopDomain, request);
+    console.log(`[Feed Generation] Using Storefront API for translations and pricing`);
+    
+    const iter = iterateProductsWithStorefront({
+      shopDomain: shopDomain,
+      storefrontAccessToken: storefrontAccessToken,
+      language: feed.language,
+      country: feed.country,
+    });
 
-  for await (const product of iter as any) {
-    products.push(product);
+    for await (const product of iter as any) {
+      products.push(product);
+    }
+    
+    console.log(`[Feed Generation] Fetched ${products.length} products with Storefront API (includes translations and localized pricing)`);
+  } catch (error) {
+    console.warn(`[Feed Generation] Storefront API failed, falling back to Admin API:`, error);
+    
+    // Fallback to Admin API
+    const iter = iterateProducts({
+      shopDomain: shopDomain,
+      accessToken: accessToken,
+      language: feed.language,
+      country: feed.country,
+    });
+
+    for await (const product of iter as any) {
+      products.push(product);
+    }
+
+    // Fetch translations if language is not English (Admin API approach)
+    if (feed.language !== 'en') {
+      console.log(`[Feed Generation] Fetching translations for language: ${feed.language}`);
+      const productIds = products.map(p => p.id);
+      translations = await fetchTranslatedProductsAdmin(
+        shopDomain,
+        accessToken,
+        feed.language,
+        productIds
+      );
+      console.log(`[Feed Generation] Fetched ${translations.size} product translations`);
+    }
   }
 
   for (const product of products) {
     let hasVariantsInFeed = false;
+    
+    // Apply translations if available
+    const translatedProduct = translations.get(product.id);
+    if (translatedProduct) {
+      // Apply translated title and description
+      if (translatedProduct.title) {
+        product.title = translatedProduct.title;
+      }
+      if (translatedProduct.description) {
+        product.bodyHtml = translatedProduct.description;
+      }
+    }
     
     // Handle both translated and regular product structures
     const variants = product.variants?.edges || product.variants || [];
@@ -58,6 +111,14 @@ export async function generateGoogleXmlAndUpload({
       
       hasVariantsInFeed = true;
       variantCount++;
+      
+      // Apply variant translations if available
+      if (translatedProduct) {
+        const translatedVariant = translatedProduct.variants.find(v => v.id === variant.id);
+        if (translatedVariant && translatedVariant.title) {
+          variant.title = translatedVariant.title;
+        }
+      }
       
       // Provide shop domain for link generation
       product.shopDomain = shopDomain;
@@ -158,6 +219,7 @@ function escapeXml(val: string) {
     .replace(/'/g, "&apos;");
 }
 
+
 /**
  * Generate language-specific product URL with variant and currency parameters
  * Format: https://shop.com/[language]/products/[handle]?variant=[variantId]&currency=[currency]
@@ -190,7 +252,7 @@ function generateProductUrl(
   }
 
   // Determine the currency code
-  let currencyCode = currency === "local" || currency === "Local currency" ? "USD" : currency;
+  let currencyCode = currency === "local" || currency === "Local currency" ? getCurrencyForCountry(country) : currency;
 
   // Build the URL path with language locale
   let path: string;

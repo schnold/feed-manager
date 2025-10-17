@@ -1,3 +1,5 @@
+import { convertCurrencyStatic, getCurrencyForCountry, formatPrice } from '../currency/currency-converter.server';
+
 export type MappedItem = Record<string, string>;
 
 function stripHtml(html?: string) {
@@ -7,10 +9,22 @@ function stripHtml(html?: string) {
 
 export function defaultGoogleMapping(product: any, variant: any, currency: string, language?: string, country?: string) : MappedItem {
   const ctx = variant?.contextualPricing;
-  const price = ctx?.price?.amount ?? variant?.price;
-  const compareAt = ctx?.compareAtPrice?.amount ?? variant?.compareAtPrice;
-  const hasSale = compareAt && Number(compareAt) > Number(price);
-  const salePrice = hasSale ? `${Number(price).toFixed(2)} ${currency}` : undefined;
+  
+  // Use contextual pricing if available, otherwise fall back to base pricing
+  let originalPrice = ctx?.price?.amount ?? variant?.price;
+  let originalCompareAt = ctx?.compareAtPrice?.amount ?? variant?.compareAtPrice;
+  let originalCurrency = ctx?.price?.currencyCode || 'USD'; // Default to USD if no currency info
+  
+  // Handle case where contextual pricing returns null or 0
+  if (!originalPrice || originalPrice === '0' || originalPrice === '0.00') {
+    originalPrice = variant?.price;
+    originalCurrency = 'USD'; // Assume base price is in USD
+  }
+  
+  if (!originalCompareAt || originalCompareAt === '0' || originalCompareAt === '0.00') {
+    originalCompareAt = variant?.compareAtPrice;
+  }
+  
   const productId = product?.id?.replace("gid://shopify/Product/", "") ?? "";
   const variantId = variant?.id?.replace("gid://shopify/ProductVariant/", "") ?? "";
 
@@ -30,20 +44,44 @@ export function defaultGoogleMapping(product: any, variant: any, currency: strin
 
   const variantUrl = productUrl && variantId ? `${productUrl}?variant=${variantId}` : productUrl;
   const description = stripHtml(product?.bodyHtml) || product?.title || "";
-  const currencyCode = currency === "Local currency" ? (ctx?.price?.currencyCode || "AUD") : currency;
-  const formattedPrice = `${Number(price || 0).toFixed(1)} ${currencyCode}`;
-  const formattedSalePrice = salePrice ? `${Number(price || 0).toFixed(1)} ${currencyCode}` : undefined;
+  
+  // Determine target currency
+  const targetCurrency = currency === "Local currency" ? getCurrencyForCountry(country) : currency;
+  
+  // If contextual pricing is available and already in the target currency, use it directly
+  let convertedPrice: number;
+  let convertedCompareAt: number | null = null;
+  
+  if (ctx?.price?.currencyCode === targetCurrency) {
+    // Contextual pricing is already in the target currency
+    convertedPrice = Number(originalPrice || 0);
+    convertedCompareAt = originalCompareAt ? Number(originalCompareAt) : null;
+  } else {
+    // Convert prices to target currency
+    convertedPrice = convertCurrencyStatic({
+      fromCurrency: originalCurrency,
+      toCurrency: targetCurrency,
+      amount: Number(originalPrice || 0)
+    });
+    
+    convertedCompareAt = originalCompareAt ? convertCurrencyStatic({
+      fromCurrency: originalCurrency,
+      toCurrency: targetCurrency,
+      amount: Number(originalCompareAt)
+    }) : null;
+  }
+  
+  const hasSale = convertedCompareAt && Number(convertedCompareAt) > Number(convertedPrice);
+  const formattedPrice = formatPrice(convertedPrice, targetCurrency);
+  const formattedSalePrice = hasSale ? formatPrice(convertedPrice, targetCurrency) : undefined;
   
   // Create title with variant info like "Product Name - Variant Title"
   const fullTitle = variant?.title && variant.title !== product?.title 
     ? `${product?.title || ""} - ${variant.title}`
     : product?.title || "";
   
-  // Add currency parameter to URL if needed
+  // Use the pre-generated URL (it already includes currency parameter)
   let finalUrl = variantUrl;
-  if (currency !== "Local currency" && currency && !variantUrl.includes("currency=")) {
-    finalUrl = variantUrl + (variantUrl.includes("?") ? "&" : "?") + `currency=${currency}`;
-  }
 
   const item: MappedItem = {
     "g:id": variantId,

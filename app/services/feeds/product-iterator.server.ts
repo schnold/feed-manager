@@ -6,14 +6,14 @@ type IteratorParams = {
 };
 
 export async function* iterateProducts(params: IteratorParams) {
-  const { shopDomain, accessToken } = params;
+  const { shopDomain, accessToken, country } = params;
 
   let cursor: string | null = null;
   const pageSize = 50;
 
   while (true) {
     const query = `
-      query Products($pageSize: Int!, $cursor: String) {
+      query Products($pageSize: Int!, $cursor: String, $country: CountryCode) {
         products(first: $pageSize, after: $cursor) {
           pageInfo { hasNextPage }
           edges {
@@ -39,6 +39,16 @@ export async function* iterateProducts(params: IteratorParams) {
                     image { url }
                     inventoryItem { tracked }
                     inventoryQuantity
+                    contextualPricing(context: {country: $country}) {
+                      price {
+                        amount
+                        currencyCode
+                      }
+                      compareAtPrice {
+                        amount
+                        currencyCode
+                      }
+                    }
                   }
                 }
               }
@@ -57,7 +67,7 @@ export async function* iterateProducts(params: IteratorParams) {
       },
       body: JSON.stringify({
         query,
-        variables: { pageSize, cursor }
+        variables: { pageSize, cursor, country }
       }),
     });
 

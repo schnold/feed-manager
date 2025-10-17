@@ -1,6 +1,6 @@
 [build]
   # Build command for Netlify
-  command = "npm run build"
+  command = "npm run netlify:build"
 
   # Directory to publish (Remix builds to build/client)
   publish = "build/client"
@@ -21,10 +21,11 @@
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
   # Omit non-sensitive environment variable names from secrets scanning
-  SECRETS_SCAN_OMIT_KEYS = "S3_REGION,S3_BUCKET,NODE_ENV,SCOPES,SHOPIFY_API_KEY"
+  # Note: SHOPIFY_API_KEY removed from omit list since shopify.app.toml is now gitignored
+  SECRETS_SCAN_OMIT_KEYS = "S3_REGION,S3_BUCKET,NODE_ENV,SCOPES"
 
   # Omit build output and lock files from secrets scanning
-  SECRETS_SCAN_OMIT_PATHS = "build/**,**/package-lock.json,**/.netlify/**"
+  SECRETS_SCAN_OMIT_PATHS = "build/**,**/package-lock.json,**/.netlify/**,shopify.app.toml.example"
 
 # Functions configuration for server-side rendering
 [functions]

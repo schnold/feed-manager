@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { Link, useLoaderData, useFetcher, useNavigate, Form } from "@remix-run/react";
+import { Link, useLoaderData, useFetcher, useNavigate, Form, useRevalidator } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { authenticate } from "../shopify.server";
 import { ShopRepository } from "../db/repositories/shop.server";
@@ -88,6 +88,7 @@ export default function FeedsIndex() {
   const [feeds, setFeeds] = useState(initialFeeds);
   const fetcher = useFetcher();
   const deleteFetcher = useFetcher();
+  const revalidator = useRevalidator();
 
   // Poll for feed status updates every 5 seconds if any feed is running or pending
   useEffect(() => {
@@ -114,16 +115,14 @@ export default function FeedsIndex() {
   // Handle delete success
   useEffect(() => {
     if (deleteFetcher.data?.success) {
-      // Reload the page to get fresh feed list
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
+      // Revalidate the loader data to get fresh feed list without full page reload
+      revalidator.revalidate();
     } else if (deleteFetcher.data?.error) {
       if (typeof window !== 'undefined') {
         alert(`Error: ${deleteFetcher.data.error}`);
       }
     }
-  }, [deleteFetcher.data]);
+  }, [deleteFetcher.data, revalidator]);
 
   // Update feeds when loader data changes
   useEffect(() => {
@@ -217,7 +216,7 @@ export default function FeedsIndex() {
     return [
       // Feed Name column
       <BlockStack gap="200" key={`name-${feed.id}`}>
-        <Link to={`/app/feeds/${feed.id}`} style={{ textDecoration: 'none' }}>
+        <Link to={`/app/feeds/new?feedId=${feed.id}`} style={{ textDecoration: 'none' }}>
           <Text as="span" fontWeight="semibold">{index + 1}. {feed.name}</Text>
         </Link>
         <InlineStack gap="200">
@@ -283,7 +282,7 @@ export default function FeedsIndex() {
             <Card>
               <BlockStack gap="400">
                 <Text as="p" variant="bodyMd">
-                  Here you can manage your feeds, view progress and status. To use your feed, copy the feed link for use in any platform. Have any questions or need help? Contact us at hello@ondigital.io.
+                  Here you can manage your feeds, view progress and status. To use your feed, copy the feed link for use in any platform. Have any questions or need help? Contact us at hi@letsgolukas.com.
                 </Text>
                 <InlineStack gap="300">
                   <Button url="https://ondigital.io/contact/" target="_blank">

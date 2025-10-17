@@ -38,6 +38,23 @@ Using pnpm:
 pnpm install
 ```
 
+### Configuration
+
+This template requires a `shopify.app.toml` file for local development with the Shopify CLI. This file contains your app's configuration including the client ID.
+
+**Important:** The `shopify.app.toml` file is gitignored to prevent committing sensitive app credentials.
+
+To set up your configuration:
+
+1. Copy the example file:
+   ```shell
+   cp shopify.app.toml.example shopify.app.toml
+   ```
+
+2. Update `shopify.app.toml` with your actual Shopify app credentials (client_id, application_url, etc.)
+
+If you used the Shopify CLI to create this app, the `shopify.app.toml` file will be automatically generated for you.
+
 ### Local Development
 
 Using yarn:

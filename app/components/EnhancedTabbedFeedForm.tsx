@@ -837,7 +837,7 @@ export function EnhancedTabbedFeedForm({
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">Help</Text>
               <Text as="p" variant="bodyMd">
-                Need help adding a new feed? Contact us at hello@ondigital.io
+                Need help adding a new feed? Contact us at hi@letsgolukas.com
               </Text>
 
               {formData.name && (
