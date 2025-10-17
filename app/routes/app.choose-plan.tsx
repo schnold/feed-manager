@@ -34,20 +34,46 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // Parse plan details
   const [planName, interval] = plan.split(':');
 
-  // Define plan pricing with 25% discount, rounded down
+  // Define plan pricing with 25% discount for yearly billing
   const plans = {
-    'base': { price: 5.00, name: 'BASE' },
-    'mid': { price: 14.00, name: 'MID' },
-    'grow': { price: 27.00, name: 'GROW' },
-    'basic': { price: 21.00, name: 'BASIC' },
-    'pro': { price: 59.00, name: 'PRO' },
-    'premium': { price: 134.00, name: 'PREMIUM' }
+    'base': {
+      monthly: 5.00,
+      yearly: 45.00, // 25% discount from 60
+      name: 'BASE'
+    },
+    'mid': {
+      monthly: 14.00,
+      yearly: 126.00, // 25% discount from 168
+      name: 'MID'
+    },
+    'grow': {
+      monthly: 27.00,
+      yearly: 243.00, // 25% discount from 324
+      name: 'GROW'
+    },
+    'basic': {
+      monthly: 21.00,
+      yearly: 189.00, // 25% discount from 252
+      name: 'BASIC'
+    },
+    'pro': {
+      monthly: 59.00,
+      yearly: 531.00, // 25% discount from 708
+      name: 'PRO'
+    },
+    'premium': {
+      monthly: 134.00,
+      yearly: 1206.00, // 25% discount from 1608
+      name: 'PREMIUM'
+    }
   };
 
   const selectedPlan = plans[planName as keyof typeof plans];
   if (!selectedPlan) {
     return json({ error: "Invalid plan selected" }, { status: 400 });
   }
+
+  const price = interval === 'yearly' ? selectedPlan.yearly : selectedPlan.monthly;
 
   const returnUrl = `${process.env.SHOPIFY_APP_URL}/app/feeds`;
 
@@ -79,8 +105,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       plan: {
         appRecurringPricingDetails: {
           price: {
-            amount: selectedPlan.price,
-            currencyCode: "USD"
+            amount: price,
+            currencyCode: "EUR"
           },
           interval: interval === 'yearly' ? 'ANNUAL' : 'EVERY_30_DAYS'
         }
@@ -113,6 +139,16 @@ export default function ChoosePlan() {
   const [showYearly, setShowYearly] = useState(false);
   const [discountCode, setDiscountCode] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<string>("grow");
+
+  // Original yearly prices before 25% discount
+  const originalYearlyPrices = {
+    base: 60,
+    mid: 168,
+    basic: 252,
+    grow: 324,
+    pro: 708,
+    premium: 1608
+  };
 
   const plans = [
     {
@@ -178,6 +214,13 @@ export default function ChoosePlan() {
                 checked={showYearly}
                 onChange={setShowYearly}
               />
+              {showYearly && (
+                <Box paddingBlockStart="100">
+                  <Text variant="bodySm" tone="success" fontWeight="bold">
+                    🎉 Save up to 25% with yearly billing!
+                  </Text>
+                </Box>
+              )}
             </Box>
 
             <Grid>
@@ -192,6 +235,7 @@ export default function ChoosePlan() {
                   >
                     <Card
                       background={plan.popular ? "bg-surface-secondary" : "bg-surface"}
+                      minHeight="600px"
                     >
                       {plan.popular && (
                         <Box padding="200" textAlign="center" background="bg-success-subdued">
@@ -202,12 +246,30 @@ export default function ChoosePlan() {
                       <BlockStack gap="400" padding="400">
                         <Text as="h3" variant="headingLg" alignment="center">{plan.name}</Text>
 
-                        <Box textAlign="center">
-                          <Text variant="headingXs" tone="subdued">Billing: {plan.interval}</Text>
+                      <Box textAlign="center">
+                        <Text variant="headingXs" tone="subdued">Billing: {plan.interval}</Text>
+                        {showYearly ? (
+                          <BlockStack gap="100" align="center">
+                            <Text
+                              variant="bodyMd"
+                              tone="subdued"
+                              style={{ textDecoration: 'line-through', opacity: 0.7 }}
+                            >
+                              €{originalYearlyPrices[plan.id as keyof typeof originalYearlyPrices]} / year
+                            </Text>
+                            <Text as="p" variant="heading2xl" fontWeight="bold" tone="success">
+                              €{plan.price} / year
+                            </Text>
+                            <Text variant="bodySm" tone="success" fontWeight="bold">
+                              Save €{originalYearlyPrices[plan.id as keyof typeof originalYearlyPrices] - plan.price}
+                            </Text>
+                          </BlockStack>
+                        ) : (
                           <Text as="p" variant="heading2xl" fontWeight="bold">
-                            €{plan.price} / {plan.interval === 'yearly' ? 'year' : 'month'}
+                            €{plan.price} / month
                           </Text>
-                        </Box>
+                        )}
+                      </Box>
 
                         <Text as="h4" variant="headingSm">Plan Features:</Text>
 
@@ -219,19 +281,23 @@ export default function ChoosePlan() {
                           ))}
                         </List>
 
-                        <form method="post">
-                          <input type="hidden" name="plan" value={`${plan.id}:${plan.interval}`} />
-                          <input type="hidden" name="discount_code" value={discountCode} />
-                          <Button submit variant="primary" size="large" fullWidth>
-                            Subscribe
-                          </Button>
-                        </form>
+                        <Box flexGrow="1" />
 
-                        {plan.popular && (
-                          <Button variant="secondary" size="medium" fullWidth tone="critical">
-                            Cancel Subscription
-                          </Button>
-                        )}
+                        <BlockStack gap="200">
+                          <form method="post">
+                            <input type="hidden" name="plan" value={`${plan.id}:${plan.interval}`} />
+                            <input type="hidden" name="discount_code" value={discountCode} />
+                            <Button submit variant="primary" size="large" fullWidth>
+                              Subscribe
+                            </Button>
+                          </form>
+
+                          {plan.popular && (
+                            <Button variant="secondary" size="medium" fullWidth tone="critical">
+                              Cancel Subscription
+                            </Button>
+                          )}
+                        </BlockStack>
                       </BlockStack>
                     </Card>
                   </Box>
@@ -239,7 +305,7 @@ export default function ChoosePlan() {
               ))}
 
               <Grid.Cell columnSpan={{xs: 12, sm: 6, md: 4, lg: 4, xl: 4}}>
-                <Card>
+                <Card minHeight="600px">
                   <BlockStack gap="400" padding="400">
                     <Text as="h3" variant="headingMd">Discount Code</Text>
 
@@ -250,6 +316,8 @@ export default function ChoosePlan() {
                       onChange={setDiscountCode}
                       autoComplete="off"
                     />
+
+                    <Box flexGrow="1" />
 
                     <Button variant="secondary" size="medium" fullWidth>
                       Apply Code
