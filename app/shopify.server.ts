@@ -7,39 +7,67 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 
+console.log("[shopify.server] Initializing Shopify app configuration...");
+console.log("[shopify.server] Environment check:", {
+  SHOPIFY_APP_URL: process.env.SHOPIFY_APP_URL ? "set" : "missing",
+  SHOPIFY_API_KEY: process.env.SHOPIFY_API_KEY ? "set" : "missing",
+  SHOPIFY_API_SECRET: process.env.SHOPIFY_API_SECRET ? "set" : "missing",
+  SCOPES: process.env.SCOPES ? "set" : "missing",
+  DATABASE_URL: process.env.DATABASE_URL ? "set" : "missing",
+  NODE_ENV: process.env.NODE_ENV,
+});
+
 // Validate required environment variables
 if (!process.env.SHOPIFY_APP_URL || process.env.SHOPIFY_APP_URL.trim() === "") {
-  throw new Error(
+  const error = new Error(
     "SHOPIFY_APP_URL environment variable is required. " +
     "Please set it in your Netlify environment variables to your site URL (e.g., https://your-site.netlify.app)"
   );
+  console.error("[shopify.server] FATAL:", error.message);
+  throw error;
 }
 
 if (!process.env.SHOPIFY_API_KEY) {
-  throw new Error("SHOPIFY_API_KEY environment variable is required");
+  const error = new Error("SHOPIFY_API_KEY environment variable is required");
+  console.error("[shopify.server] FATAL:", error.message);
+  throw error;
 }
 
 if (!process.env.SHOPIFY_API_SECRET) {
-  throw new Error("SHOPIFY_API_SECRET environment variable is required");
+  const error = new Error("SHOPIFY_API_SECRET environment variable is required");
+  console.error("[shopify.server] FATAL:", error.message);
+  throw error;
 }
 
-const shopify = shopifyApp({
-  apiKey: process.env.SHOPIFY_API_KEY,
-  apiSecretKey: process.env.SHOPIFY_API_SECRET,
-  apiVersion: ApiVersion.January25,
-  scopes: process.env.SCOPES?.split(","),
-  appUrl: process.env.SHOPIFY_APP_URL,
-  authPathPrefix: "/auth",
-  sessionStorage: new PrismaSessionStorage(prisma),
-  distribution: AppDistribution.AppStore,
-  future: {
-    unstable_newEmbeddedAuthStrategy: true,
-    removeRest: true,
-  },
-  ...(process.env.SHOP_CUSTOM_DOMAIN
-    ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
-    : {}),
-});
+let shopify;
+try {
+  console.log("[shopify.server] Creating shopifyApp instance...");
+  shopify = shopifyApp({
+    apiKey: process.env.SHOPIFY_API_KEY,
+    apiSecretKey: process.env.SHOPIFY_API_SECRET,
+    apiVersion: ApiVersion.January25,
+    scopes: process.env.SCOPES?.split(","),
+    appUrl: process.env.SHOPIFY_APP_URL,
+    authPathPrefix: "/auth",
+    sessionStorage: new PrismaSessionStorage(prisma),
+    distribution: AppDistribution.AppStore,
+    future: {
+      unstable_newEmbeddedAuthStrategy: true,
+      removeRest: true,
+    },
+    ...(process.env.SHOP_CUSTOM_DOMAIN
+      ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
+      : {}),
+  });
+  console.log("[shopify.server] Shopify app initialized successfully");
+} catch (error) {
+  console.error("[shopify.server] FATAL: Failed to initialize shopifyApp:", error);
+  if (error instanceof Error) {
+    console.error("[shopify.server] Error message:", error.message);
+    console.error("[shopify.server] Error stack:", error.stack);
+  }
+  throw error;
+}
 
 export default shopify;
 export const apiVersion = ApiVersion.January25;
