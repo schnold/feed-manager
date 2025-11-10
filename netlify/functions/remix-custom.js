@@ -2,6 +2,21 @@ import { createRequestHandler } from "@remix-run/node";
 import * as build from "../../build/server/index.js";
 
 console.log("[remix-custom] Initializing custom Netlify handler...");
+console.log("[remix-custom] Build exports:", Object.keys(build));
+console.log("[remix-custom] Build.routes type:", typeof build.routes);
+console.log("[remix-custom] Build.routes value:", build.routes ? "exists" : "undefined/null");
+
+// Validate build structure
+if (!build.routes) {
+  console.error("[remix-custom] FATAL: build.routes is undefined!");
+  console.error("[remix-custom] This indicates a Remix build configuration issue with v3_routeConfig");
+  console.error("[remix-custom] Available build exports:", Object.keys(build).join(", "));
+  throw new Error(
+    "Remix build is missing routes export. " +
+    "This may be due to a build configuration issue with v3_routeConfig. " +
+    "Available exports: " + Object.keys(build).join(", ")
+  );
+}
 
 // Create Remix request handler
 const remixHandler = createRequestHandler({ build, mode: process.env.NODE_ENV || "production" });

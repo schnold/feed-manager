@@ -12,6 +12,7 @@ export default [
       route(":feedId", "routes/app.feeds.$feedId.tsx"),
     ]),
   ]),
+  route("auth/$", "routes/auth.$.tsx"),
   route("auth/login", "routes/auth.login/route.tsx"),
   route("feeds/:feedId.xml", "routes/feeds.$feedId.xml.ts"),
   route("api/feeds/:feedId/delete", "routes/api/feeds.$feedId.delete.ts"),
