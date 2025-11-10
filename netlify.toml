@@ -31,43 +31,11 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
 
 # Cache static assets
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
-
-# Redirects for Remix routing (Netlify adapter creates a 'remix' function by default)
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/remix"
-  status = 200
-
-# API routes
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/remix"
-  status = 200
-
-# Webhook routes
-[[redirects]]
-  from = "/webhooks/*"
-  to = "/.netlify/functions/remix"
-  status = 200
-
-# Auth routes
-[[redirects]]
-  from = "/auth/*"
-  to = "/.netlify/functions/remix"
-  status = 200
-
-# Feed XML routes
-[[redirects]]
-  from = "/feeds/*.xml"
-  to = "/.netlify/functions/remix"
-  status = 200
