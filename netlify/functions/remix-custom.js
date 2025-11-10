@@ -1,4 +1,4 @@
-// Flattened version without subfolder to reduce bundle size
+// ES Module function for Netlify
 // Use dynamic import to keep Remix build external
 const build = await import("../../build/server/index.js");
 
