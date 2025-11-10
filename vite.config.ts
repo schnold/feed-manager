@@ -78,13 +78,11 @@ export default defineConfig({
       serverPlatform: "node",
       serverMinify: process.env.NODE_ENV === "production",
       serverDependenciesToBundle: [
-        "@netlify/remix-adapter",
+        // Bundle most dependencies to reduce function size
         "@shopify/shopify-app-remix",
         "@shopify/shopify-app-session-storage-prisma",
-        "@prisma/client",
-        "bullmq",
-        "ioredis",
         "xmlbuilder2",
+        /^(?!@prisma|prisma|bullmq|ioredis).*/
       ],
     }),
     tsconfigPaths(),

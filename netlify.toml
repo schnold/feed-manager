@@ -35,11 +35,11 @@
   # Directory for Netlify Functions
   directory = "netlify/functions"
   
-  # Use Node File Tracer for better dependency resolution
-  node_bundler = "nft"
+  # Use esbuild to bundle the function
+  node_bundler = "esbuild"
   
-  # Include build directory
-  included_files = ["build/**", "node_modules/**"]
+  # Exclude source files to reduce size
+  excluded_patterns = ["scripts/**", "tests/**", "*.test.ts", "*.test.js"]
 
 # Redirects for Remix routing
 [[redirects]]

@@ -1,4 +1,7 @@
-import * as build from "../../../build/server/index.js";
+// Renamed to .mjs to work better with ESM
+// Use dynamic import to prevent esbuild from bundling the entire Remix build
+const buildPath = "../../../build/server/index.js";
+const build = await import(buildPath);
 
 console.log("[remix-custom] Initializing custom Netlify handler...");
 console.log("[remix-custom] Build exports:", Object.keys(build));
@@ -43,10 +46,10 @@ console.log("[remix-custom] Routes validated successfully:", routeKeys.length, "
 
 // Import createRequestHandler from @remix-run/node instead of @netlify/remix-adapter
 // This gives us more control over request handling
-import { createRequestHandler as createNodeRequestHandler } from "@remix-run/node";
+const { createRequestHandler } = await import("@remix-run/node");
 
 // Create Remix request handler using Node adapter
-const nodeHandler = createNodeRequestHandler({ 
+const nodeHandler = createRequestHandler({ 
   build, 
   mode: process.env.NODE_ENV || "production"
 });
