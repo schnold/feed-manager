@@ -1,6 +1,20 @@
 import { createRequestHandler } from "@netlify/remix-adapter";
 import * as build from "../../build/server/index.js";
 
+// Polyfill Request to always have a signal (fixes "Cannot read properties of undefined (reading 'aborted')" error)
+// This is necessary because the Netlify adapter creates Request objects without signals in serverless environments
+const OriginalRequest = globalThis.Request;
+globalThis.Request = class Request extends OriginalRequest {
+  constructor(input, init) {
+    // Ensure signal is always present
+    const initWithSignal = {
+      ...init,
+      signal: init?.signal || new AbortController().signal,
+    };
+    super(input, initWithSignal);
+  }
+};
+
 console.log("[remix-custom] Initializing custom Netlify handler...");
 console.log("[remix-custom] Build exports:", Object.keys(build));
 console.log("[remix-custom] Build.routes type:", typeof build.routes);
