@@ -1,15 +1,23 @@
 // ES Module function for Netlify
-// Use dynamic import to keep Remix build external
-const build = await import("../../build/server/index.js");
+// Lazy load to avoid top-level await issues with esbuild
+let nodeHandler;
+let initialized = false;
 
-console.log("[remix-custom] Initializing...");
-
-const { createRequestHandler } = await import("@remix-run/node");
-
-const nodeHandler = createRequestHandler({ 
-  build, 
-  mode: process.env.NODE_ENV || "production"
-});
+async function initialize() {
+  if (initialized) return;
+  
+  console.log("[remix-custom] Initializing...");
+  const build = await import("../../build/server/index.js");
+  const { createRequestHandler } = await import("@remix-run/node");
+  
+  nodeHandler = createRequestHandler({ 
+    build, 
+    mode: process.env.NODE_ENV || "production"
+  });
+  
+  initialized = true;
+  console.log("[remix-custom] Initialized successfully");
+}
 
 function createRequestFromEvent(event) {
   const protocol = event.headers?.['x-forwarded-proto'] || 'https';
@@ -66,6 +74,9 @@ async function createNetlifyResponse(webResponse) {
 
 export const handler = async (event, context) => {
   try {
+    // Initialize on first request
+    await initialize();
+    
     const request = createRequestFromEvent(event);
     const webResponse = await nodeHandler(request, {
       context: { netlifyEvent: event, netlifyContext: context },
