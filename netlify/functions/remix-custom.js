@@ -1,19 +1,4 @@
-import { createRequestHandler } from "@netlify/remix-adapter";
 import * as build from "../../build/server/index.js";
-
-// Polyfill Request to always have a signal (fixes "Cannot read properties of undefined (reading 'aborted')" error)
-// This is necessary because the Netlify adapter creates Request objects without signals in serverless environments
-const OriginalRequest = globalThis.Request;
-globalThis.Request = class Request extends OriginalRequest {
-  constructor(input, init) {
-    // Ensure signal is always present
-    const initWithSignal = {
-      ...init,
-      signal: init?.signal || new AbortController().signal,
-    };
-    super(input, initWithSignal);
-  }
-};
 
 console.log("[remix-custom] Initializing custom Netlify handler...");
 console.log("[remix-custom] Build exports:", Object.keys(build));
@@ -32,20 +17,87 @@ if (!build.routes) {
   );
 }
 
-// Create Remix request handler using Netlify adapter
-// Use getLoadContext to ensure requests have signals for serverless environments
-const remixHandler = createRequestHandler({ 
+// Import createRequestHandler from @remix-run/node instead of @netlify/remix-adapter
+// This gives us more control over request handling
+import { createRequestHandler as createNodeRequestHandler } from "@remix-run/node";
+
+// Create Remix request handler using Node adapter
+const nodeHandler = createNodeRequestHandler({ 
   build, 
-  mode: process.env.NODE_ENV || "production",
-  getLoadContext: (event, context) => {
-    // Ensure the request has a signal property to prevent "aborted" errors
-    // This is a workaround for serverless environments where requests might not have signals
+  mode: process.env.NODE_ENV || "production"
+});
+
+// Helper to convert Netlify event to Web Request with signal
+function createRequestFromEvent(event) {
+  const protocol = event.headers?.['x-forwarded-proto'] || 'https';
+  const host = event.headers?.host || event.headers?.['x-forwarded-host'] || 'localhost';
+  const path = event.rawPath || event.path || "/";
+  const query = event.rawQueryString || "";
+  const url = `${protocol}://${host}${path}${query ? `?${query}` : ""}`;
+
+  console.log("[remix-custom] Creating request for URL:", url);
+
+  const headers = new Headers();
+  if (event.headers) {
+    for (const [key, value] of Object.entries(event.headers)) {
+      if (value !== undefined) {
+        headers.append(key, value);
+      }
+    }
+  }
+
+  const controller = new AbortController();
+  const init = {
+    method: event.httpMethod || event.requestContext?.http?.method || "GET",
+    headers,
+    signal: controller.signal, // Always provide a signal
+  };
+
+  if (event.body) {
+    init.body = event.isBase64Encoded ? Buffer.from(event.body, "base64").toString() : event.body;
+  }
+
+  return new Request(url, init);
+}
+
+// Helper to convert Web Response to Netlify response
+async function createNetlifyResponse(webResponse) {
+  const headers = {};
+  webResponse.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+
+  let body;
+  const contentType = headers["content-type"] || "";
+
+  // Handle different content types
+  if (contentType.includes("text/") || contentType.includes("application/json") || contentType.includes("application/xml")) {
+    body = await webResponse.text();
     return {
-      netlifyEvent: event,
-      netlifyContext: context,
+      statusCode: webResponse.status,
+      headers,
+      body,
+    };
+  } else if (contentType.includes("image/") || contentType.includes("application/octet-stream") || contentType.includes("application/pdf")) {
+    // Binary content - base64 encode
+    const buffer = await webResponse.arrayBuffer();
+    body = Buffer.from(buffer).toString("base64");
+    return {
+      statusCode: webResponse.status,
+      headers,
+      body,
+      isBase64Encoded: true,
+    };
+  } else {
+    // Default to text for HTML and other text-based content
+    body = await webResponse.text();
+    return {
+      statusCode: webResponse.status,
+      headers,
+      body,
     };
   }
-});
+}
 
 export const handler = async (event, context) => {
   console.log("[remix-custom] Handler invoked");
@@ -53,73 +105,25 @@ export const handler = async (event, context) => {
   console.log("[remix-custom] HTTP method:", event.httpMethod || event.requestContext?.http?.method);
 
   try {
-    // Ensure the event has all required properties for Netlify adapter
-    if (!event.path) {
-      event.path = event.rawPath || "/";
-    }
-    
-    if (!event.rawUrl) {
-      const protocol = event.headers?.['x-forwarded-proto'] || 'https';
-      const host = event.headers?.host || event.headers?.['x-forwarded-host'] || 'localhost';
-      const path = event.path || event.rawPath || "/";
-      const query = event.rawQueryString || "";
-      event.rawUrl = `${protocol}://${host}${path}${query ? `?${query}` : ""}`;
-    }
-    
-    if (!event.url) {
-      event.url = event.rawUrl;
-    }
-    
-    if (!event.headers) {
-      event.headers = {};
-    }
-    
-    if (!event.queryStringParameters) {
-      event.queryStringParameters = {};
-    }
-    
-    if (!event.multiValueQueryStringParameters) {
-      event.multiValueQueryStringParameters = {};
-    }
-    
-    if (!event.rawQueryString) {
-      const queryParams = event.queryStringParameters || {};
-      const queryString = Object.entries(queryParams)
-        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-        .join("&");
-      event.rawQueryString = queryString;
-    }
-    
-    if (!event.httpMethod) {
-      event.httpMethod = "GET";
-    }
-    
-    if (!event.requestContext) {
-      event.requestContext = {
-        http: {
-          method: event.httpMethod || "GET",
-          path: event.path || "/",
-          protocol: "HTTP/1.1",
-          sourceIp: event.headers?.['x-forwarded-for']?.split(',')[0] || "127.0.0.1",
-          userAgent: event.headers?.['user-agent'] || "",
-        },
-      };
-    }
-    
-    if (event.isBase64Encoded === undefined) {
-      event.isBase64Encoded = false;
-    }
-    
-    if (event.body === undefined) {
-      event.body = null;
-    }
+    // Create Web Request from Netlify event (with signal)
+    const request = createRequestFromEvent(event);
+    console.log("[remix-custom] Request created successfully with signal");
 
-    // Call Remix handler (Netlify adapter handles the conversion)
+    // Call Remix Node handler
     console.log("[remix-custom] Calling Remix handler...");
-    const response = await remixHandler(event, context);
-    console.log("[remix-custom] Remix handler completed, status:", response?.statusCode || response?.status);
+    const webResponse = await nodeHandler(request, {
+      context: {
+        netlifyEvent: event,
+        netlifyContext: context,
+      },
+    });
+    console.log("[remix-custom] Remix handler completed, status:", webResponse.status);
 
-    return response;
+    // Convert Web Response to Netlify response
+    const netlifyResponse = await createNetlifyResponse(webResponse);
+    console.log("[remix-custom] Response converted successfully");
+
+    return netlifyResponse;
   } catch (error) {
     console.error("[remix-custom] ERROR:", error);
     console.error("[remix-custom] Error name:", error?.name);
