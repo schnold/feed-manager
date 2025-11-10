@@ -2,6 +2,7 @@ import { vitePlugin as remix } from "@remix-run/dev";
 import { installGlobals } from "@remix-run/node";
 import { defineConfig, type UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
+import { netlifyPlugin } from "@netlify/remix-adapter/plugin";
 
 installGlobals({ nativeFetch: true });
 
@@ -72,19 +73,8 @@ export default defineConfig({
         v3_singleFetch: false,
         v3_routeConfig: true,
       },
-      // Optimize for Netlify Functions
-      serverBuildFile: "index.js",
-      serverModuleFormat: "esm",
-      serverPlatform: "node",
-      serverMinify: process.env.NODE_ENV === "production",
-      serverDependenciesToBundle: [
-        // Bundle most dependencies to reduce function size
-        "@shopify/shopify-app-remix",
-        "@shopify/shopify-app-session-storage-prisma",
-        "xmlbuilder2",
-        /^(?!@prisma|prisma|bullmq|ioredis).*/
-      ],
     }),
+    netlifyPlugin(),
     tsconfigPaths(),
   ],
   build: {

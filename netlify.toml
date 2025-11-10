@@ -4,9 +4,6 @@
 
   # Directory to publish (Remix builds to build/client)
   publish = "build/client"
-  
-  # Include all dependencies for functions
-  functions = "netlify/functions"
 
 # Build environment variables
 [build.environment]
@@ -30,29 +27,10 @@
   # Omit build output and lock files from secrets scanning
   SECRETS_SCAN_OMIT_PATHS = "build/**,**/package-lock.json,**/.netlify/**,shopify.app.toml.example"
 
-# Functions configuration for server-side rendering
-[functions]
-  # Directory for Netlify Functions
-  directory = "netlify/functions"
-  
-  # Use NFT to trace dynamic imports and include dependencies
-  node_bundler = "nft"
-  
-  # Include build directory and essential node_modules
-  included_files = [
-    "build/server/**",
-    "node_modules/@remix-run/**",
-    "node_modules/react/**",
-    "node_modules/react-dom/**",
-    "node_modules/@shopify/**",
-    "node_modules/@prisma/**",
-    "node_modules/prisma/**"
-  ]
-
-# Redirects for Remix routing
+# Redirects for Remix routing (Netlify adapter will handle server function)
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/remix-custom"
+  to = "/.netlify/functions/server"
   status = 200
 
 # Headers for security and performance
@@ -73,23 +51,23 @@
 # API routes
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/remix-custom"
+  to = "/.netlify/functions/server"
   status = 200
 
 # Webhook routes
 [[redirects]]
   from = "/webhooks/*"
-  to = "/.netlify/functions/remix-custom"
+  to = "/.netlify/functions/server"
   status = 200
 
 # Auth routes
 [[redirects]]
   from = "/auth/*"
-  to = "/.netlify/functions/remix-custom"
+  to = "/.netlify/functions/server"
   status = 200
 
 # Feed XML routes
 [[redirects]]
   from = "/feeds/*.xml"
-  to = "/.netlify/functions/remix-custom"
+  to = "/.netlify/functions/server"
   status = 200
