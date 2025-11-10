@@ -38,7 +38,7 @@
 # Redirects for Remix routing
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/remix"
+  to = "/.netlify/functions/remix-custom"
   status = 200
 
 # Headers for security and performance
@@ -59,23 +59,23 @@
 # API routes
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/remix"
+  to = "/.netlify/functions/remix-custom"
   status = 200
 
 # Webhook routes
 [[redirects]]
   from = "/webhooks/*"
-  to = "/.netlify/functions/remix"
+  to = "/.netlify/functions/remix-custom"
   status = 200
 
 # Auth routes
 [[redirects]]
   from = "/auth/*"
-  to = "/.netlify/functions/remix"
+  to = "/.netlify/functions/remix-custom"
   status = 200
 
 # Feed XML routes
 [[redirects]]
   from = "/feeds/*.xml"
-  to = "/.netlify/functions/remix"
+  to = "/.netlify/functions/remix-custom"
   status = 200
