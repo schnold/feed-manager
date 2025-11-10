@@ -10,7 +10,20 @@ async function initialize() {
   
   // Use dynamic path to prevent esbuild from bundling the build
   const buildPath = ["../../build", "server", "index.js"].join("/");
-  const build = await import(buildPath);
+  const buildModule = await import(buildPath);
+  
+  // The build might be the default export or the module itself
+  const build = buildModule.default || buildModule;
+  
+  console.log("[remix-custom] Build structure:", {
+    hasDefault: !!buildModule.default,
+    hasRoutes: !!build.routes,
+    hasAssets: !!build.assets,
+    hasEntry: !!build.entry,
+    routesType: typeof build.routes,
+    routesKeys: build.routes ? Object.keys(build.routes).slice(0, 5) : 'none'
+  });
+  
   const { createRequestHandler } = await import("@remix-run/node");
   
   nodeHandler = createRequestHandler({ 
