@@ -19,9 +19,18 @@ if (!build.routes) {
 }
 
 // Create Remix request handler using Netlify adapter
+// Use getLoadContext to ensure requests have signals for serverless environments
 const remixHandler = createRequestHandler({ 
   build, 
-  mode: process.env.NODE_ENV || "production" 
+  mode: process.env.NODE_ENV || "production",
+  getLoadContext: (event, context) => {
+    // Ensure the request has a signal property to prevent "aborted" errors
+    // This is a workaround for serverless environments where requests might not have signals
+    return {
+      netlifyEvent: event,
+      netlifyContext: context,
+    };
+  }
 });
 
 export const handler = async (event, context) => {

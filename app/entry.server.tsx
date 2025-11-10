@@ -16,14 +16,23 @@ export default async function handleRequest(
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
+  // Ensure request has a signal property for serverless environments
+  // This prevents "Cannot read properties of undefined (reading 'aborted')" errors
+  // Create a new request with signal if missing (Request objects are immutable)
+  const requestWithSignal = request.signal 
+    ? request 
+    : new Request(request, {
+        signal: new AbortController().signal,
+      });
+
   try {
-    addDocumentResponseHeaders(request, responseHeaders);
+    addDocumentResponseHeaders(requestWithSignal, responseHeaders);
   } catch (error) {
     console.error("[entry.server] Error adding document response headers:", error);
     // Continue anyway - this shouldn't be fatal
   }
 
-  const userAgent = request.headers.get("user-agent");
+  const userAgent = requestWithSignal.headers.get("user-agent");
   const callbackName = isbot(userAgent ?? '')
     ? "onAllReady"
     : "onShellReady";
@@ -36,7 +45,7 @@ export default async function handleRequest(
       const { pipe, abort } = renderToPipeableStream(
         <RemixServer
           context={remixContext}
-          url={request.url}
+          url={requestWithSignal.url}
         />,
         {
           [callbackName]: () => {
