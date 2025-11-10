@@ -22,7 +22,7 @@
     "prisma": "prisma",
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
-    "netlify:build": "npm run setup && npm run build",
+    "netlify:build": "npm run setup && npm run build && echo '{\"type\":\"module\"}' > build/server/package.json",
     "netlify:dev": "netlify dev"
   },
   "type": "module",
