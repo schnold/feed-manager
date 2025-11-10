@@ -27,12 +27,6 @@
   # Omit build output and lock files from secrets scanning
   SECRETS_SCAN_OMIT_PATHS = "build/**,**/package-lock.json,**/.netlify/**,shopify.app.toml.example"
 
-# Redirects for Remix routing (Netlify adapter will handle server function)
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/server"
-  status = 200
-
 # Headers for security and performance
 [[headers]]
   for = "/*"
@@ -48,26 +42,32 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# Redirects for Remix routing (Netlify adapter creates a 'remix' function by default)
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/remix"
+  status = 200
+
 # API routes
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/server"
+  to = "/.netlify/functions/remix"
   status = 200
 
 # Webhook routes
 [[redirects]]
   from = "/webhooks/*"
-  to = "/.netlify/functions/server"
+  to = "/.netlify/functions/remix"
   status = 200
 
 # Auth routes
 [[redirects]]
   from = "/auth/*"
-  to = "/.netlify/functions/server"
+  to = "/.netlify/functions/remix"
   status = 200
 
 # Feed XML routes
 [[redirects]]
   from = "/feeds/*.xml"
-  to = "/.netlify/functions/server"
+  to = "/.netlify/functions/remix"
   status = 200
