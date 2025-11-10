@@ -27,3 +27,6 @@ database.sqlite
 .shopify/*
 .shopify.lock
 shopify.app.toml
+
+# Local Netlify folder
+.netlify

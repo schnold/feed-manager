@@ -78,6 +78,7 @@ export default defineConfig({
       serverPlatform: "node",
       serverMinify: process.env.NODE_ENV === "production",
       serverDependenciesToBundle: [
+        "@netlify/remix-adapter",
         "@shopify/shopify-app-remix",
         "@shopify/shopify-app-session-storage-prisma",
         "@prisma/client",

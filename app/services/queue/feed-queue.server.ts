@@ -3,37 +3,53 @@ import Redis from "ioredis";
 import { generateGoogleXML } from "../feeds/generate-google-xml.server";
 import { FeedRepository } from "../../db/repositories/feed.server";
 
-// Redis connection for BullMQ
-const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
-  maxRetriesPerRequest: null,
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
-  lazyConnect: true
-});
+// Redis connection for BullMQ - only connect if REDIS_URL is provided
+let redis: Redis | null = null;
+
+if (process.env.REDIS_URL) {
+  try {
+    redis = new Redis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      retryDelayOnFailover: 100,
+      enableReadyCheck: false,
+      lazyConnect: true,
+      connectTimeout: 5000,
+      // Don't throw errors on connection failures
+      retryStrategy: () => null, // Disable automatic retries
+    });
+  } catch (error) {
+    console.warn('Failed to create Redis connection:', error);
+    redis = null;
+  }
+} else {
+  console.warn('REDIS_URL not provided. Queue functionality will be disabled.');
+}
 
 // Handle Redis connection errors gracefully
-redis.on('error', (error) => {
-  console.warn('Redis connection error:', error.message);
-  console.warn('Queue functionality will be disabled. Install Redis locally or fix Redis URL.');
-});
+if (redis) {
+  redis.on('error', (error) => {
+    console.warn('Redis connection error:', error.message);
+    console.warn('Queue functionality will be disabled. Install Redis locally or fix Redis URL.');
+  });
 
-redis.on('connect', () => {
-  console.log('Redis connected successfully');
-});
+  redis.on('connect', () => {
+    console.log('Redis connected successfully');
+  });
 
-redis.on('ready', async () => {
-  console.log('Redis ready');
-  // Check eviction policy
-  try {
-    const policy = await redis.config('GET', 'maxmemory-policy');
-    if (policy && policy[1] !== 'noeviction') {
-      console.warn(`⚠️  Redis eviction policy is "${policy[1]}". For optimal BullMQ performance, it should be "noeviction".`);
-      console.warn('   This may cause job data to be evicted under memory pressure.');
+  redis.on('ready', async () => {
+    console.log('Redis ready');
+    // Check eviction policy
+    try {
+      const policy = await redis!.config('GET', 'maxmemory-policy');
+      if (policy && policy[1] !== 'noeviction') {
+        console.warn(`⚠️  Redis eviction policy is "${policy[1]}". For optimal BullMQ performance, it should be "noeviction".`);
+        console.warn('   This may cause job data to be evicted under memory pressure.');
+      }
+    } catch (error) {
+      console.warn('Could not check Redis eviction policy:', error);
     }
-  } catch (error) {
-    console.warn('Could not check Redis eviction policy:', error);
-  }
-});
+  });
+}
 
 // Job data interface
 interface FeedGenerationJob {
@@ -47,22 +63,26 @@ interface FeedGenerationJob {
 // Create the feed generation queue with error handling
 let feedGenerationQueue: Queue<FeedGenerationJob> | null = null;
 
-try {
-  feedGenerationQueue = new Queue<FeedGenerationJob>("feed-generation", {
-    connection: redis,
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-        type: "exponential",
-        delay: 2000
-      },
-      removeOnComplete: 10,
-      removeOnFail: 5
-    }
-  });
-} catch (error) {
-  console.warn('Failed to create feed generation queue:', error);
-  feedGenerationQueue = null;
+if (redis) {
+  try {
+    feedGenerationQueue = new Queue<FeedGenerationJob>("feed-generation", {
+      connection: redis,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: "exponential",
+          delay: 2000
+        },
+        removeOnComplete: 10,
+        removeOnFail: 5
+      }
+    });
+  } catch (error) {
+    console.warn('Failed to create feed generation queue:', error);
+    feedGenerationQueue = null;
+  }
+} else {
+  console.warn('Redis not available. Feed generation queue will not be created.');
 }
 
 export { feedGenerationQueue };
@@ -106,8 +126,8 @@ export async function enqueueFeedGeneration(data: FeedGenerationJob) {
 // Worker to process feed generation jobs
 let feedGenerationWorker: Worker<FeedGenerationJob> | null = null;
 
-try {
-  if (feedGenerationQueue) {
+if (redis && feedGenerationQueue) {
+  try {
     feedGenerationWorker = new Worker<FeedGenerationJob>(
       "feed-generation",
       async (job: Job<FeedGenerationJob>) => {
@@ -157,10 +177,10 @@ try {
         concurrency: 2 // Process 2 feeds concurrently
       }
     );
+  } catch (error) {
+    console.warn('Failed to create feed generation worker:', error);
+    feedGenerationWorker = null;
   }
-} catch (error) {
-  console.warn('Failed to create feed generation worker:', error);
-  feedGenerationWorker = null;
 }
 
 export { feedGenerationWorker };
@@ -174,6 +194,8 @@ process.on("SIGINT", async () => {
   if (feedGenerationQueue) {
     await feedGenerationQueue.close();
   }
-  await redis.disconnect();
+  if (redis) {
+    await redis.disconnect();
+  }
   process.exit(0);
 });
