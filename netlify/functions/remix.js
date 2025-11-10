@@ -32,7 +32,7 @@ const remixHandler = createRequestHandler({
   mode: process.env.NODE_ENV || "production",
 });
 
-// Wrap handler to ensure request URL is valid
+// Wrap handler to ensure request URL is valid and handle errors properly
 export const handler = async (event, context) => {
   try {
     // Ensure the request has a valid URL
@@ -79,24 +79,57 @@ export const handler = async (event, context) => {
       event.rawQueryString = queryString;
     }
     
-    return await remixHandler(event, context);
+    // Ensure httpMethod exists (required by adapter)
+    if (!event.httpMethod) {
+      event.httpMethod = "GET";
+    }
+    
+    // Ensure requestContext exists (required by adapter)
+    if (!event.requestContext) {
+      event.requestContext = {
+        http: {
+          method: event.httpMethod || "GET",
+          path: event.path || "/",
+          protocol: "HTTP/1.1",
+          sourceIp: event.headers?.['x-forwarded-for']?.split(',')[0] || "127.0.0.1",
+          userAgent: event.headers?.['user-agent'] || "",
+        },
+      };
+    }
+    
+    // Ensure isBase64Encoded exists (defaults to false)
+    if (event.isBase64Encoded === undefined) {
+      event.isBase64Encoded = false;
+    }
+    
+    // Ensure body exists (can be null or string)
+    if (event.body === undefined) {
+      event.body = null;
+    }
+    
+    // Call the handler and catch any errors
+    const response = await remixHandler(event, context);
+    return response;
   } catch (error) {
+    // Handle errors more gracefully
     console.error("Error in Remix handler:", error);
+    console.error("Error stack:", error.stack);
     console.error("Event structure:", {
       path: event?.path,
       rawPath: event?.rawPath,
       rawUrl: event?.rawUrl,
       url: event?.url,
       headers: event?.headers ? Object.keys(event.headers) : "missing",
+      requestContext: event?.requestContext ? "exists" : "missing",
     });
     
-    // Return a proper error response
+    // Return a proper error response that matches Netlify's expected format
     return {
       statusCode: 500,
       headers: {
-        "Content-Type": "text/plain",
+        "Content-Type": "text/html; charset=utf-8",
       },
-      body: `Internal Server Error: ${error.message}`,
+      body: `<!DOCTYPE html><html><head><title>Error</title></head><body><h1>Internal Server Error</h1><p>${error.message || "An error occurred"}</p></body></html>`,
     };
   }
 };
