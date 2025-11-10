@@ -4,43 +4,56 @@ import { generateGoogleXML } from "../feeds/generate-google-xml.server";
 import { FeedRepository } from "../../db/repositories/feed.server";
 
 // Redis connection for BullMQ - only connect if REDIS_URL is provided
-let redis: Redis | null = null;
+// Note: We need separate connections for Queue (can use number) and Worker (must be null)
+let redisQueue: Redis | null = null;
+let redisWorker: Redis | null = null;
 
 if (process.env.REDIS_URL) {
   try {
-    redis = new Redis(process.env.REDIS_URL, {
+    // Connection for Queue - can use maxRetriesPerRequest: 3
+    redisQueue = new Redis(process.env.REDIS_URL, {
       maxRetriesPerRequest: 3,
       retryDelayOnFailover: 100,
       enableReadyCheck: false,
       lazyConnect: true,
       connectTimeout: 5000,
-      // Don't throw errors on connection failures
+      retryStrategy: () => null, // Disable automatic retries
+    });
+
+    // Connection for Worker - must use maxRetriesPerRequest: null for blocking operations
+    redisWorker = new Redis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: null, // Required for BullMQ Workers
+      retryDelayOnFailover: 100,
+      enableReadyCheck: false,
+      lazyConnect: true,
+      connectTimeout: 5000,
       retryStrategy: () => null, // Disable automatic retries
     });
   } catch (error) {
     console.warn('Failed to create Redis connection:', error);
-    redis = null;
+    redisQueue = null;
+    redisWorker = null;
   }
 } else {
   console.warn('REDIS_URL not provided. Queue functionality will be disabled.');
 }
 
 // Handle Redis connection errors gracefully
-if (redis) {
-  redis.on('error', (error) => {
-    console.warn('Redis connection error:', error.message);
+if (redisQueue) {
+  redisQueue.on('error', (error) => {
+    console.warn('Redis queue connection error:', error.message);
     console.warn('Queue functionality will be disabled. Install Redis locally or fix Redis URL.');
   });
 
-  redis.on('connect', () => {
-    console.log('Redis connected successfully');
+  redisQueue.on('connect', () => {
+    console.log('Redis queue connected successfully');
   });
 
-  redis.on('ready', async () => {
-    console.log('Redis ready');
+  redisQueue.on('ready', async () => {
+    console.log('Redis queue ready');
     // Check eviction policy
     try {
-      const policy = await redis!.config('GET', 'maxmemory-policy');
+      const policy = await redisQueue!.config('GET', 'maxmemory-policy');
       if (policy && policy[1] !== 'noeviction') {
         console.warn(`⚠️  Redis eviction policy is "${policy[1]}". For optimal BullMQ performance, it should be "noeviction".`);
         console.warn('   This may cause job data to be evicted under memory pressure.');
@@ -48,6 +61,16 @@ if (redis) {
     } catch (error) {
       console.warn('Could not check Redis eviction policy:', error);
     }
+  });
+}
+
+if (redisWorker) {
+  redisWorker.on('error', (error) => {
+    console.warn('Redis worker connection error:', error.message);
+  });
+
+  redisWorker.on('connect', () => {
+    console.log('Redis worker connected successfully');
   });
 }
 
@@ -63,10 +86,10 @@ interface FeedGenerationJob {
 // Create the feed generation queue with error handling
 let feedGenerationQueue: Queue<FeedGenerationJob> | null = null;
 
-if (redis) {
+if (redisQueue) {
   try {
     feedGenerationQueue = new Queue<FeedGenerationJob>("feed-generation", {
-      connection: redis,
+      connection: redisQueue,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -124,9 +147,13 @@ export async function enqueueFeedGeneration(data: FeedGenerationJob) {
 }
 
 // Worker to process feed generation jobs
+// Note: Workers should NOT be created in serverless environments like Netlify Functions
+// They should run in a separate long-running process
 let feedGenerationWorker: Worker<FeedGenerationJob> | null = null;
 
-if (redis && feedGenerationQueue) {
+// Only create worker if we're NOT in a serverless environment
+// In Netlify Functions, workers should run separately (e.g., in a scheduled function or external service)
+if (redisWorker && feedGenerationQueue && process.env.NODE_ENV !== 'production') {
   try {
     feedGenerationWorker = new Worker<FeedGenerationJob>(
       "feed-generation",
@@ -173,7 +200,7 @@ if (redis && feedGenerationQueue) {
         }
       },
       {
-        connection: redis,
+        connection: redisWorker, // Use worker-specific connection with maxRetriesPerRequest: null
         concurrency: 2 // Process 2 feeds concurrently
       }
     );
@@ -181,6 +208,8 @@ if (redis && feedGenerationQueue) {
     console.warn('Failed to create feed generation worker:', error);
     feedGenerationWorker = null;
   }
+} else if (process.env.NODE_ENV === 'production') {
+  console.log('Worker not created in production serverless environment. Use a separate worker process.');
 }
 
 export { feedGenerationWorker };
@@ -194,8 +223,11 @@ process.on("SIGINT", async () => {
   if (feedGenerationQueue) {
     await feedGenerationQueue.close();
   }
-  if (redis) {
-    await redis.disconnect();
+  if (redisQueue) {
+    await redisQueue.disconnect();
+  }
+  if (redisWorker) {
+    await redisWorker.disconnect();
   }
   process.exit(0);
 });
