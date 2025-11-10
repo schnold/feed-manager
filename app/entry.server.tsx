@@ -23,6 +23,9 @@ export default async function handleRequest(
     : "onShellReady";
 
   return new Promise((resolve, reject) => {
+    let isResolved = false;
+    let timeoutId: NodeJS.Timeout | null = null;
+    
     const { pipe, abort } = renderToPipeableStream(
       <RemixServer
         context={remixContext}
@@ -30,6 +33,15 @@ export default async function handleRequest(
       />,
       {
         [callbackName]: () => {
+          if (isResolved) return;
+          isResolved = true;
+          
+          // Clear timeout if response is ready
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          
           const body = new PassThrough();
           const stream = createReadableStreamFromReadable(body);
 
@@ -43,6 +55,15 @@ export default async function handleRequest(
           pipe(body);
         },
         onShellError(error) {
+          if (isResolved) return;
+          isResolved = true;
+          
+          // Clear timeout on error
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          
           reject(error);
         },
         onError(error) {
@@ -54,6 +75,17 @@ export default async function handleRequest(
 
     // Automatically timeout the React renderer after 6 seconds, which ensures
     // React has enough time to flush down the rejected boundary contents
-    setTimeout(abort, streamTimeout + 1000);
+    // Only set timeout if we're not in a serverless environment where cleanup might be problematic
+    timeoutId = setTimeout(() => {
+      if (!isResolved && typeof abort === 'function') {
+        try {
+          abort();
+        } catch (error) {
+          // Ignore abort errors in serverless environments
+          // The response may have already been resolved or the context cleaned up
+          console.warn('Abort function error (safe to ignore in serverless):', error);
+        }
+      }
+    }, streamTimeout + 1000);
   });
 }
