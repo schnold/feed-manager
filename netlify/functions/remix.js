@@ -108,28 +108,54 @@ export const handler = async (event, context) => {
     }
     
     // Call the handler and catch any errors
-    const response = await remixHandler(event, context);
+    let response;
+    try {
+      response = await remixHandler(event, context);
+    } catch (handlerError) {
+      // The Netlify adapter may throw errors when handling requests
+      // Log detailed information to help debug the issue
+      console.error("[remix.js] Netlify Remix handler threw an error:", handlerError);
+      console.error("[remix.js] Error name:", handlerError?.name);
+      console.error("[remix.js] Error message:", handlerError?.message);
+      console.error("[remix.js] Error stack:", handlerError?.stack);
+
+      // Log the full error object structure
+      if (handlerError && typeof handlerError === 'object') {
+        console.error("[remix.js] Error keys:", Object.keys(handlerError));
+        console.error("[remix.js] Full error:", JSON.stringify(handlerError, null, 2));
+      }
+
+      // Re-throw to be caught by outer catch block
+      throw handlerError;
+    }
+
     return response;
   } catch (error) {
     // Handle errors more gracefully
-    console.error("Error in Remix handler:", error);
-    console.error("Error stack:", error.stack);
-    console.error("Event structure:", {
+    console.error("[remix.js] Error in Remix function wrapper:", error);
+    console.error("[remix.js] Error type:", typeof error);
+    console.error("[remix.js] Error constructor:", error?.constructor?.name);
+    console.error("[remix.js] Error message:", error?.message);
+    console.error("[remix.js] Error stack:", error?.stack);
+
+    console.error("[remix.js] Event structure:", {
       path: event?.path,
       rawPath: event?.rawPath,
       rawUrl: event?.rawUrl,
       url: event?.url,
+      httpMethod: event?.httpMethod,
       headers: event?.headers ? Object.keys(event.headers) : "missing",
       requestContext: event?.requestContext ? "exists" : "missing",
+      body: event?.body ? "present" : "null/undefined",
     });
-    
+
     // Return a proper error response that matches Netlify's expected format
     return {
       statusCode: 500,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
       },
-      body: `<!DOCTYPE html><html><head><title>Error</title></head><body><h1>Internal Server Error</h1><p>${error.message || "An error occurred"}</p></body></html>`,
+      body: `<!DOCTYPE html><html><head><title>Error</title></head><body><h1>Internal Server Error</h1><p>${error?.message || "An error occurred"}</p><details style="margin-top: 1rem;"><summary>Error Details</summary><pre style="background: #f5f5f5; padding: 1rem; overflow: auto;">${error?.stack || "No stack trace available"}</pre></details></body></html>`,
     };
   }
 };
