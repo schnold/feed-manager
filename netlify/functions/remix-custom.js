@@ -7,7 +7,10 @@ async function initialize() {
   if (initialized) return;
   
   console.log("[remix-custom] Initializing...");
-  const build = await import("../../build/server/index.js");
+  
+  // Use dynamic path to prevent esbuild from bundling the build
+  const buildPath = ["../../build", "server", "index.js"].join("/");
+  const build = await import(buildPath);
   const { createRequestHandler } = await import("@remix-run/node");
   
   nodeHandler = createRequestHandler({ 

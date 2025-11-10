@@ -37,6 +37,13 @@
   
   # Use esbuild to bundle the function
   node_bundler = "esbuild"
+  
+  # Keep the build directory in the deployment
+  included_files = ["build/**"]
+
+[functions."remix-custom"]
+  # Keep Remix build external from bundling
+  external_node_modules = ["@remix-run/*", "@shopify/*", "@prisma/*", "prisma"]
 
 # Redirects for Remix routing
 [[redirects]]
