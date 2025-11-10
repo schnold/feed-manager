@@ -37,9 +37,6 @@
   
   # Use esbuild to bundle the function
   node_bundler = "esbuild"
-  
-  # Exclude source files to reduce size
-  excluded_patterns = ["scripts/**", "tests/**", "*.test.ts", "*.test.js"]
 
 # Redirects for Remix routing
 [[redirects]]
