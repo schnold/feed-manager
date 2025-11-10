@@ -35,15 +35,16 @@
   # Directory for Netlify Functions
   directory = "netlify/functions"
   
-  # Use esbuild to bundle the function
-  node_bundler = "esbuild"
+  # Use NFT to trace dynamic imports and include dependencies
+  node_bundler = "nft"
   
-  # Keep the build directory in the deployment
-  included_files = ["build/**"]
-
-[functions."remix-custom"]
-  # Keep Remix build external from bundling
-  external_node_modules = ["@remix-run/*", "@shopify/*", "@prisma/*", "prisma"]
+  # Include build directory and essential node_modules
+  included_files = [
+    "build/server/**",
+    "node_modules/@remix-run/**",
+    "node_modules/react/**",
+    "node_modules/react-dom/**"
+  ]
 
 # Redirects for Remix routing
 [[redirects]]
