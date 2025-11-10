@@ -1,0 +1,10 @@
+{
+  "name": "remix-custom-function",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@remix-run/node": "^2.16.1",
+    "@remix-run/react": "^2.16.1"
+  }
+}
+

@@ -4,6 +4,9 @@
 
   # Directory to publish (Remix builds to build/client)
   publish = "build/client"
+  
+  # Include all dependencies for functions
+  functions = "netlify/functions"
 
 # Build environment variables
 [build.environment]
@@ -32,8 +35,11 @@
   # Directory for Netlify Functions
   directory = "netlify/functions"
   
-  # Node.js version for functions
-  node_bundler = "esbuild"
+  # Use Node File Tracer for better dependency resolution
+  node_bundler = "nft"
+  
+  # Include build directory
+  included_files = ["build/**", "node_modules/**"]
 
 # Redirects for Remix routing
 [[redirects]]

@@ -1,21 +1,45 @@
-import * as build from "../../build/server/index.js";
+import * as build from "../../../build/server/index.js";
 
 console.log("[remix-custom] Initializing custom Netlify handler...");
 console.log("[remix-custom] Build exports:", Object.keys(build));
 console.log("[remix-custom] Build.routes type:", typeof build.routes);
 console.log("[remix-custom] Build.routes value:", build.routes ? "exists" : "undefined/null");
 
-// Validate build structure
-if (!build.routes) {
+// Debug routes structure
+if (build.routes) {
+  const routeKeys = Object.keys(build.routes);
+  console.log("[remix-custom] Build.routes keys count:", routeKeys.length);
+  console.log("[remix-custom] Build.routes keys:", routeKeys.slice(0, 5).join(", "), "...");
+  
+  // Check if routes is actually an object with valid route entries
+  if (routeKeys.length > 0) {
+    const firstRoute = build.routes[routeKeys[0]];
+    console.log("[remix-custom] First route structure:", typeof firstRoute, firstRoute ? "has value" : "null/undefined");
+  }
+} else {
   console.error("[remix-custom] FATAL: build.routes is undefined!");
-  console.error("[remix-custom] This indicates a Remix build configuration issue with v3_routeConfig");
+}
+
+// Validate build structure - ensure routes is an object with entries
+if (!build.routes || typeof build.routes !== 'object') {
+  console.error("[remix-custom] FATAL: build.routes is not a valid object!");
+  console.error("[remix-custom] Type:", typeof build.routes);
+  console.error("[remix-custom] Value:", build.routes);
   console.error("[remix-custom] Available build exports:", Object.keys(build).join(", "));
+  
   throw new Error(
-    "Remix build is missing routes export. " +
-    "This may be due to a build configuration issue with v3_routeConfig. " +
+    "Remix build has invalid routes export (not an object). " +
     "Available exports: " + Object.keys(build).join(", ")
   );
 }
+
+const routeKeys = Object.keys(build.routes);
+if (routeKeys.length === 0) {
+  console.error("[remix-custom] FATAL: build.routes is empty!");
+  throw new Error("Remix build has empty routes object");
+}
+
+console.log("[remix-custom] Routes validated successfully:", routeKeys.length, "routes found");
 
 // Import createRequestHandler from @remix-run/node instead of @netlify/remix-adapter
 // This gives us more control over request handling
@@ -162,3 +186,4 @@ export const handler = async (event, context) => {
 };
 
 export default handler;
+
