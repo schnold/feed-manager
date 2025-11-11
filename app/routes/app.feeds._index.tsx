@@ -8,6 +8,7 @@ import { FeedRepository } from "../db/repositories/feed.server";
 import { deleteXmlFromS3 } from "../services/storage/s3.server";
 import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
 import { getCurrencyDisplay } from "../utils/currency";
+import { getPlanConfig, canCreateFeed } from "../config/plans.server";
 import {
   Page,
   Layout,
@@ -21,7 +22,8 @@ import {
   EmptyState,
   Spinner,
   Icon,
-  Link as PolarisLink
+  Link as PolarisLink,
+  Banner
 } from "@shopify/polaris";
 import {
   ClipboardIcon,
@@ -37,14 +39,35 @@ import {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
 
+  // Check for billing status in query params
+  const url = new URL(request.url);
+  const billingStatus = url.searchParams.get("billing");
+  const billingError = url.searchParams.get("error");
+
   const shop = await ShopRepository.upsert({
     myshopifyDomain: session.shop,
     accessToken: session.accessToken
   });
 
   const feeds = await FeedRepository.findByShopId(shop.id);
+  
+  // Get plan configuration and check if user can create more feeds
+  const planConfig = getPlanConfig(shop.plan);
+  const canCreate = canCreateFeed(shop.plan, feeds.length);
+  const maxFeeds = planConfig.maxFeeds === -1 ? 'unlimited' : planConfig.maxFeeds;
 
-  return json({ feeds, shop });
+  return json({ 
+    feeds, 
+    shop,
+    planInfo: {
+      planName: planConfig.name,
+      currentFeeds: feeds.length,
+      maxFeeds,
+      canCreateMore: canCreate
+    },
+    billingStatus,
+    billingError
+  });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -117,8 +140,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function FeedsIndex() {
-  const { feeds: initialFeeds } = useLoaderData<typeof loader>();
+  const { feeds: initialFeeds, planInfo, billingStatus, billingError } = useLoaderData<typeof loader>();
   const [feeds, setFeeds] = useState(initialFeeds);
+  const [showBillingBanner, setShowBillingBanner] = useState(!!billingStatus);
   const [copiedFeedId, setCopiedFeedId] = useState<string | null>(null);
   const fetcher = useFetcher();
   const deleteFetcher = useFetcher();
@@ -342,14 +366,63 @@ export default function FeedsIndex() {
   return (
     <Page
       title="Feed Manager"
-      primaryAction={{
+      primaryAction={planInfo.canCreateMore ? {
         content: "Create Feed",
         url: "/app/feeds/new"
-      }}
+      } : undefined}
     >
       <Layout>
         <Layout.Section>
           <BlockStack gap="500">
+            {/* Billing success banner */}
+            {showBillingBanner && billingStatus === 'success' && (
+              <Banner
+                title="Subscription activated!"
+                tone="success"
+                onDismiss={() => setShowBillingBanner(false)}
+              >
+                <p>
+                  Your {planInfo.planName} plan has been activated successfully. 
+                  {planInfo.maxFeeds === 'unlimited' 
+                    ? 'You can now create unlimited feeds!' 
+                    : `You can now create up to ${planInfo.maxFeeds} feeds.`
+                  }
+                </p>
+              </Banner>
+            )}
+
+            {/* Billing error banner */}
+            {showBillingBanner && billingStatus === 'error' && (
+              <Banner
+                title="Payment processing issue"
+                tone="critical"
+                onDismiss={() => setShowBillingBanner(false)}
+              >
+                <p>
+                  There was an issue processing your subscription. 
+                  Your plan has been updated via our backup system. 
+                  If you continue to experience issues, please contact support.
+                </p>
+              </Banner>
+            )}
+
+            {/* Feed limit warning banner */}
+            {!planInfo.canCreateMore && (
+              <Banner
+                title="Feed limit reached"
+                tone="warning"
+                action={{
+                  content: 'Upgrade Plan',
+                  url: '/app/choose-plan'
+                }}
+              >
+                <p>
+                  You have reached the maximum of {planInfo.maxFeeds} feeds for your {planInfo.planName} plan. 
+                  Upgrade to create more feeds.
+                </p>
+              </Banner>
+            )}
+            
             <Card>
               <BlockStack gap="400">
                 <Text as="p" variant="bodyMd">
@@ -403,10 +476,22 @@ export default function FeedsIndex() {
 
             {feeds.length > 0 && (
               <Card>
-                <Text as="p" variant="bodyMd">
-                  You now have {feeds.length} feeds which is the maximum on your current plan.{' '}
-                  <Link to="/app/choose-plan">Upgrade in order to add more feeds</Link>
-                </Text>
+                <BlockStack gap="300">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                    Current Plan: {planInfo.planName}
+                  </Text>
+                  <Text as="p" variant="bodyMd">
+                    {planInfo.maxFeeds === 'unlimited' 
+                      ? `You have ${feeds.length} feeds (unlimited on your plan)`
+                      : `You are using ${feeds.length} of ${planInfo.maxFeeds} feeds available on your plan`
+                    }
+                  </Text>
+                  {!planInfo.canCreateMore && (
+                    <Text as="p" variant="bodyMd">
+                      <Link to="/app/choose-plan">Upgrade your plan</Link> to create more feeds
+                    </Text>
+                  )}
+                </BlockStack>
               </Card>
             )}
           </BlockStack>
