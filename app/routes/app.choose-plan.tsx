@@ -11,9 +11,11 @@ import {
   Checkbox,
   TextField,
   List,
-  Grid
+  Grid,
+  Banner
 } from "@shopify/polaris";
 import { useState } from "react";
+import { useActionData } from "@remix-run/react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -113,24 +115,52 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const response = await admin.graphql(mutation, { variables });
     const jsonResponse = await response.json();
 
-    if (jsonResponse.data?.appSubscriptionCreate?.userErrors?.length > 0) {
-      console.error('Subscription creation errors:', jsonResponse.data.appSubscriptionCreate.userErrors);
-      return json({ error: "Failed to create subscription" }, { status: 400 });
+    // Check for GraphQL errors
+    if (jsonResponse.errors) {
+      console.error('GraphQL errors:', jsonResponse.errors);
+      const errorMessage = jsonResponse.errors.map((e: any) => e.message).join(', ');
+      return json({ 
+        error: "Failed to create subscription",
+        details: errorMessage
+      }, { status: 400 });
     }
 
+    // Check for user errors from the mutation
+    if (jsonResponse.data?.appSubscriptionCreate?.userErrors?.length > 0) {
+      const userErrors = jsonResponse.data.appSubscriptionCreate.userErrors;
+      console.error('Subscription creation userErrors:', userErrors);
+      const errorMessage = userErrors.map((e: any) => e.message).join(', ');
+      return json({ 
+        error: "Failed to create subscription",
+        details: errorMessage
+      }, { status: 400 });
+    }
+
+    // Check if we got a confirmation URL
     const confirmationUrl = jsonResponse.data?.appSubscriptionCreate?.confirmationUrl;
     if (confirmationUrl) {
+      console.log('Subscription created successfully, redirecting to:', confirmationUrl);
       return redirect(confirmationUrl);
     }
 
-    return json({ error: "Failed to get confirmation URL" }, { status: 500 });
+    // If no confirmation URL and no errors, something unexpected happened
+    console.error('No confirmation URL returned:', jsonResponse);
+    return json({ 
+      error: "Failed to get confirmation URL",
+      details: "The subscription was created but no confirmation URL was returned"
+    }, { status: 500 });
   } catch (error) {
     console.error('GraphQL error:', error);
-    return json({ error: "Internal server error" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return json({ 
+      error: "Internal server error",
+      details: errorMessage
+    }, { status: 500 });
   }
 };
 
 export default function ChoosePlan() {
+  const actionData = useActionData<typeof action>();
   const [showYearly, setShowYearly] = useState(false);
   const [discountCode, setDiscountCode] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<string>("grow");
@@ -199,6 +229,15 @@ export default function ChoosePlan() {
   return (
     <Page title="Choose Your Plan">
       <BlockStack gap="500">
+        {actionData?.error && (
+          <Banner tone="critical" title={actionData.error}>
+            {actionData.details && (
+              <Text as="p" variant="bodyMd">
+                {actionData.details}
+              </Text>
+            )}
+          </Banner>
+        )}
         <Box background="bg-surface" padding="400" borderRadius="300" minHeight="100%">
           <BlockStack gap="400">
             <Text as="h2" variant="heading2xl" alignment="center">Choose Your Plan</Text>
