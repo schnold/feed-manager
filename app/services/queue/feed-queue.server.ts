@@ -192,9 +192,8 @@ export { feedGenerationQueue };
 
 // Add job to queue
 export async function enqueueFeedGeneration(data: FeedGenerationJob) {
-  if (!feedGenerationQueue) {
+  const processSynchronously = async () => {
     console.warn('Feed generation queue is not available. Processing feed generation synchronously.');
-    // Fallback: process feed generation synchronously
     try {
       await FeedRepository.updateStatus(data.feedId, "running", new Date());
       await generateGoogleXML({
@@ -210,20 +209,29 @@ export async function enqueueFeedGeneration(data: FeedGenerationJob) {
       console.error(`[Sync] Failed to generate feed ${data.feedId}:`, errorMessage);
       throw error;
     }
-    return;
+  };
+
+  if (!feedGenerationQueue) {
+    return processSynchronously();
   }
 
-  return feedGenerationQueue.add(
-    `generate-feed-${data.feedId}`,
-    data,
-    {
-      // Prevent duplicate jobs for same feed
-      jobId: `feed-${data.feedId}`,
-      // Remove existing job with same ID if any
-      removeOnComplete: true,
-      removeOnFail: true
-    }
-  );
+  // Try to enqueue, but fall back to synchronous processing if Redis fails
+  try {
+    return await feedGenerationQueue.add(
+      `generate-feed-${data.feedId}`,
+      data,
+      {
+        // Prevent duplicate jobs for same feed
+        jobId: `feed-${data.feedId}`,
+        // Remove existing job with same ID if any
+        removeOnComplete: true,
+        removeOnFail: true
+      }
+    );
+  } catch (error) {
+    console.warn(`Failed to enqueue feed generation (${error instanceof Error ? error.message : 'Unknown error'}). Falling back to synchronous processing.`);
+    return processSynchronously();
+  }
 }
 
 // Worker to process feed generation jobs
