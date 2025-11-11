@@ -6,7 +6,7 @@ import {
   type EntryContext,
 } from "@remix-run/node";
 import { isbot } from "isbot";
-// import { addDocumentResponseHeaders } from "./shopify.server";
+import { addDocumentResponseHeaders } from "./shopify.server";
 
 export const streamTimeout = 5000;
 
@@ -25,15 +25,16 @@ export default async function handleRequest(
         signal: new AbortController().signal,
       });
 
-  // IMPORTANT: Commented out for Netlify deployment
-  // The Shopify addDocumentResponseHeaders sets X-Frame-Options: DENY
-  // which prevents the app from loading in Shopify Admin's iframe
-  // try {
-  //   addDocumentResponseHeaders(requestWithSignal, responseHeaders);
-  // } catch (error) {
-  //   console.error("[entry.server] Error adding document response headers:", error);
-  //   // Continue anyway - this shouldn't be fatal
-  // }
+  // IMPORTANT: addDocumentResponseHeaders sets the proper Content-Security-Policy
+  // frame-ancestors directive for embedded apps, allowing the app to be framed
+  // by the authenticated shop domain and admin.shopify.com
+  // This is required for embedded Shopify apps to work correctly
+  try {
+    addDocumentResponseHeaders(requestWithSignal, responseHeaders);
+  } catch (error) {
+    console.error("[entry.server] Error adding document response headers:", error);
+    // Continue anyway - this shouldn't be fatal, but may cause embedding issues
+  }
 
   const userAgent = requestWithSignal.headers.get("user-agent");
   const callbackName = isbot(userAgent ?? '')

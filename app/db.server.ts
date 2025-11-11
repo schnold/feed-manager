@@ -21,7 +21,12 @@ try {
     // In production (serverless), always create a new client
     // Don't use global cache in serverless environments
     console.log("[db.server] Creating new Prisma client (production)");
-    prisma = new PrismaClient();
+    prisma = new PrismaClient({
+      // Note: Connection pool settings (connection_limit, pool_timeout) should be
+      // configured in the DATABASE_URL connection string for serverless environments.
+      // Example: postgresql://user:pass@host:port/db?connection_limit=20&pool_timeout=30
+      // This helps prevent "Timed out fetching a new connection from the connection pool" errors
+    });
   }
   console.log("[db.server] Prisma client initialized successfully");
 } catch (error) {
