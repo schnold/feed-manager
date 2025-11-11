@@ -5,14 +5,13 @@ import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
  * 
  * Setup Instructions:
  * 1. Add FEED_REGENERATION_SECRET to your Netlify environment variables
- * 2. Configure the schedule in netlify.toml:
- *    [functions."scheduled-feed-regeneration"]
- *    schedule = "0 2 * * *"  # Run daily at 2 AM UTC
+ * 2. Configure the schedule in netlify.toml
  * 
- * Alternative schedules:
- * - "0 */6 * * *"    # Every 6 hours
- * - "0 0 * * 0"      # Weekly on Sunday at midnight
- * - "0 */2 * * *"    # Every 2 hours
+ * Schedule examples (configure in netlify.toml):
+ * - Daily at 2 AM UTC: "0 2 * * *"
+ * - Every 6 hours: "0 *\/6 * * *"
+ * - Weekly on Sunday: "0 0 * * 0"
+ * - Every 2 hours: "0 *\/2 * * *"
  * 
  * To manually trigger: Deploy this function and use Netlify's Functions UI
  */
