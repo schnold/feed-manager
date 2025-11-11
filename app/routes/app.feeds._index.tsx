@@ -30,7 +30,8 @@ import {
   StatusActiveIcon,
   ClockIcon,
   AlertCircleIcon,
-  RefreshIcon
+  RefreshIcon,
+  CheckIcon
 } from "@shopify/polaris-icons";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -118,6 +119,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function FeedsIndex() {
   const { feeds: initialFeeds } = useLoaderData<typeof loader>();
   const [feeds, setFeeds] = useState(initialFeeds);
+  const [copiedFeedId, setCopiedFeedId] = useState<string | null>(null);
   const fetcher = useFetcher();
   const deleteFetcher = useFetcher();
   const regenerateFetcher = useFetcher();
@@ -251,12 +253,18 @@ export default function FeedsIndex() {
 
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         await navigator.clipboard.writeText(feedUrl);
-        // You could add a toast notification here
-        alert("Feed link copied to clipboard!");
+        
+        // Set the copied state for this specific feed
+        setCopiedFeedId(feedId);
+        
+        // Reset the copied state after 2 seconds
+        setTimeout(() => {
+          setCopiedFeedId(null);
+        }, 2000);
       }
     } catch (error) {
       console.error("Failed to copy:", error);
-      alert("Failed to copy feed link");
+      // You could add a toast notification here for errors
     }
   };
 
@@ -264,6 +272,7 @@ export default function FeedsIndex() {
     const lastUpdated = feed.updatedAt ? formatDate(feed.updatedAt) : null;
     const statusText = getStatusText(feed.status);
     const isGenerating = feed.status === "running" || feed.status === "pending";
+    const isCopied = copiedFeedId === feed.id;
 
     return [
       // Feed Name column
@@ -289,10 +298,11 @@ export default function FeedsIndex() {
         key={`link-${feed.id}`}
         onClick={() => copyFeedLink(feed.id, feed.publicUrl)}
         disabled={feed.status !== "success"}
-        icon={ClipboardIcon}
+        icon={isCopied ? CheckIcon : ClipboardIcon}
         variant="plain"
+        tone={isCopied ? "success" : undefined}
       >
-        Copy Link
+        {isCopied ? "Copied" : "Copy Link"}
       </Button>,
       // Last Updated column
       lastUpdated ? (
