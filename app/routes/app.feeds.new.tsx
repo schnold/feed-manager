@@ -9,6 +9,7 @@ import { getShopLocations } from "../services/shopify/locations.server";
 import { EnhancedTabbedFeedForm } from "../components/EnhancedTabbedFeedForm";
 import { Page, Layout, Banner } from "@shopify/polaris";
 import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
+import { randomUUID } from "crypto";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -132,7 +133,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     // Handle create action
-    const token = crypto.randomUUID();
+    const token = randomUUID();
 
     // Create feed with placeholder values first
     const feed = await FeedRepository.create({
