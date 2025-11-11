@@ -30,7 +30,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shop = await ShopRepository.findByDomain(session.shop);
   const currentPlan = shop?.plan || 'basic';
   
-  return json({ currentPlan, errorType });
+  // Transform plans for client (server-side only)
+  const plansForClient = getAllPlans().map(plan => ({
+    id: plan.id,
+    name: plan.name,
+    monthlyPrice: plan.monthlyPrice,
+    yearlyPrice: plan.yearlyPrice,
+    features: plan.features
+  }));
+  
+  return json({ currentPlan, errorType, plans: plansForClient });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -117,7 +126,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function ChoosePlan() {
-  const { currentPlan, errorType } = useLoaderData<typeof loader>();
+  const { currentPlan, errorType, plans: plansFromLoader } = useLoaderData<typeof loader>();
   const [showYearly, setShowYearly] = useState(false);
   const [discountCode, setDiscountCode] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<string>(currentPlan);
@@ -128,8 +137,8 @@ export default function ChoosePlan() {
     return Math.round((yearlyPrice / 0.75) * 100) / 100;
   };
 
-  // Convert plan config to display format
-  const plans = getAllPlans().map(plan => ({
+  // Transform plans from loader data for display
+  const plans = plansFromLoader.map(plan => ({
     id: plan.id,
     name: plan.name,
     price: showYearly ? plan.yearlyPrice : plan.monthlyPrice,
