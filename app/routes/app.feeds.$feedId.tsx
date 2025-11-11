@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { FeedRepository } from "../db/repositories/feed.server";
+import { getCurrencyDisplay } from "../utils/currency";
 import {
   Page,
   Layout,
@@ -209,7 +210,7 @@ function InfoPanel({ feed }: { feed: any }) {
                 <tr><td style={{ padding: "4px 0", fontWeight: "500" }}>Target market:</td><td style={{ padding: "4px 0" }}>{targetMarketDisplay}</td></tr>
                 <tr><td style={{ padding: "4px 0", fontWeight: "500" }}>Language:</td><td style={{ padding: "4px 0" }}>{feed.language?.toUpperCase()}</td></tr>
                 <tr><td style={{ padding: "4px 0", fontWeight: "500" }}>Country:</td><td style={{ padding: "4px 0" }}>{feed.country?.toUpperCase()}</td></tr>
-                <tr><td style={{ padding: "4px 0", fontWeight: "500" }}>Currency:</td><td style={{ padding: "4px 0" }}>{feed.currency}</td></tr>
+                <tr><td style={{ padding: "4px 0", fontWeight: "500" }}>Currency:</td><td style={{ padding: "4px 0" }}>{getCurrencyDisplay(feed.currency, feed.country)}</td></tr>
                 <tr><td style={{ padding: "4px 0", fontWeight: "500" }}>File type:</td><td style={{ padding: "4px 0" }}>{feed.fileType}</td></tr>
                 <tr><td style={{ padding: "4px 0", fontWeight: "500" }}>Timezone:</td><td style={{ padding: "4px 0" }}>{feed.timezone}</td></tr>
                 <tr><td style={{ padding: "4px 0", fontWeight: "500" }}>Schedules:</td><td style={{ padding: "4px 0" }}>{scheduleCount}</td></tr>

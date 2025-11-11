@@ -6,6 +6,8 @@ import { authenticate } from "../shopify.server";
 import { ShopRepository } from "../db/repositories/shop.server";
 import { FeedRepository } from "../db/repositories/feed.server";
 import { deleteXmlFromS3 } from "../services/storage/s3.server";
+import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
+import { getCurrencyDisplay } from "../utils/currency";
 import {
   Page,
   Layout,
@@ -28,7 +30,8 @@ import {
   DeleteIcon,
   StatusActiveIcon,
   ClockIcon,
-  AlertCircleIcon
+  AlertCircleIcon,
+  RefreshIcon
 } from "@shopify/polaris-icons";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -80,6 +83,36 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
+  if (action === "regenerate" && feedId) {
+    try {
+      // Get the feed to verify ownership and get shop credentials
+      const feed = await FeedRepository.findById(feedId);
+      if (!feed) {
+        return json({ error: "Feed not found" }, { status: 404 });
+      }
+
+      // Get shop to verify ownership
+      const shop = await ShopRepository.findByDomain(session.shop);
+      if (!shop || feed.shopId !== shop.id) {
+        return json({ error: "Unauthorized" }, { status: 403 });
+      }
+
+      // Enqueue the generation job with the feed's existing settings
+      await enqueueFeedGeneration({
+        feedId: feed.id,
+        shopId: feed.shopId,
+        shopDomain: feed.shop.myshopifyDomain,
+        accessToken: feed.shop.accessToken,
+        triggeredBy: "manual-regenerate"
+      });
+
+      return json({ success: true, message: "Feed regeneration started" });
+    } catch (error) {
+      console.error("Error regenerating feed:", error);
+      return json({ error: "Failed to regenerate feed" }, { status: 500 });
+    }
+  }
+
   return json({ error: "Invalid action" }, { status: 400 });
 };
 
@@ -88,6 +121,7 @@ export default function FeedsIndex() {
   const [feeds, setFeeds] = useState(initialFeeds);
   const fetcher = useFetcher();
   const deleteFetcher = useFetcher();
+  const regenerateFetcher = useFetcher();
   const revalidator = useRevalidator();
 
   // Poll for feed status updates every 5 seconds if any feed is running or pending
@@ -124,6 +158,22 @@ export default function FeedsIndex() {
     }
   }, [deleteFetcher.data, revalidator]);
 
+  // Handle regenerate success
+  useEffect(() => {
+    if (regenerateFetcher.data?.success) {
+      // Revalidate to show updated status
+      revalidator.revalidate();
+      if (typeof window !== 'undefined') {
+        // Optional: Show success message
+        console.log('Feed regeneration started');
+      }
+    } else if (regenerateFetcher.data?.error) {
+      if (typeof window !== 'undefined') {
+        alert(`Error: ${regenerateFetcher.data.error}`);
+      }
+    }
+  }, [regenerateFetcher.data, revalidator]);
+
   // Update feeds when loader data changes
   useEffect(() => {
     setFeeds(initialFeeds);
@@ -136,6 +186,13 @@ export default function FeedsIndex() {
       formData.append("_action", "delete");
       deleteFetcher.submit(formData, { method: "post" });
     }
+  };
+
+  const handleRegenerateFeed = (feedId: string) => {
+    const formData = new FormData();
+    formData.append("feedId", feedId);
+    formData.append("_action", "regenerate");
+    regenerateFetcher.submit(formData, { method: "post" });
   };
 
   const formatDate = (dateString: string) => {
@@ -154,10 +211,6 @@ export default function FeedsIndex() {
     };
   };
 
-  const getCurrencyDisplay = (currency: string) => {
-    if (currency === "local" || currency === "Local currency") return "Local";
-    return currency;
-  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -222,7 +275,7 @@ export default function FeedsIndex() {
         <InlineStack gap="200">
           <Badge>{feed.language?.toUpperCase() || 'EN'}</Badge>
           <Badge>{feed.country?.toUpperCase() || 'US'}</Badge>
-          <Badge>{getCurrencyDisplay(feed.currency || 'USD')}</Badge>
+          <Badge>{getCurrencyDisplay(feed.currency || 'USD', feed.country)}</Badge>
         </InlineStack>
       </BlockStack>,
       // Status column
@@ -253,6 +306,15 @@ export default function FeedsIndex() {
       ),
       // Actions column
       <ButtonGroup key={`actions-${feed.id}`}>
+        <Button
+          icon={RefreshIcon}
+          variant="plain"
+          onClick={() => handleRegenerateFeed(feed.id)}
+          disabled={isGenerating}
+          loading={regenerateFetcher.state === "submitting" && regenerateFetcher.formData?.get("feedId") === feed.id}
+        >
+          Regenerate
+        </Button>
         <Link to={`/app/feeds/new?feedId=${feed.id}`}>
           <Button icon={EditIcon} variant="plain">Edit</Button>
         </Link>

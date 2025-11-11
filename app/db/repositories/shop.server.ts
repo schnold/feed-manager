@@ -8,6 +8,12 @@ export class ShopRepository {
     });
   }
 
+  static async findAll(): Promise<Shop[]> {
+    return db.shop.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
   static async create(data: {
     myshopifyDomain: string;
     accessToken: string;
