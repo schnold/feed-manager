@@ -31,9 +31,12 @@ export class FeedRepository {
     });
   }
 
-  static async findByShopId(shopId: string): Promise<Feed[]> {
+  static async findByShopId(shopId: string): Promise<any[]> {
     return db.feed.findMany({
       where: { shopId },
+      include: {
+        shop: true
+      },
       orderBy: { updatedAt: "desc" }
     });
   }

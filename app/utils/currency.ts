@@ -64,13 +64,24 @@ export const getCountryCurrency = (countryCode: string): string => {
  * @returns Formatted currency string like "USD ($)" or "EUR (€)"
  */
 export const getCurrencyDisplay = (currency: string, country?: string): string => {
+  // Debug logging
+  console.log('[getCurrencyDisplay]', { currency, country, currencyType: typeof currency, countryType: typeof country });
+  
+  // Handle empty/undefined currency
+  if (!currency) {
+    return country ? getCurrencyDisplay("local", country) : "USD ($)";
+  }
+
   // Handle local currency
-  if (currency === "local" || currency === "Local currency") {
-    if (country) {
+  if (currency.toLowerCase() === "local" || currency.toLowerCase() === "local currency") {
+    console.log('[getCurrencyDisplay] Local currency detected, country:', country);
+    if (country && typeof country === 'string' && country.length >= 2) {
       const localCurrency = getCountryCurrency(country.toUpperCase());
       const symbol = getCurrencySymbol(localCurrency);
+      console.log('[getCurrencyDisplay] Resolved to:', localCurrency, symbol);
       return `${localCurrency} (${symbol})`;
     }
+    console.log('[getCurrencyDisplay] Country invalid, returning "Local"');
     return "Local";
   }
   

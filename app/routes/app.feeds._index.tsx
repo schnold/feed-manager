@@ -14,7 +14,6 @@ import {
   Card,
   DataTable,
   Button,
-  ButtonGroup,
   Badge,
   Text,
   BlockStack,
@@ -305,7 +304,7 @@ export default function FeedsIndex() {
         <Text as="span" tone="subdued" key={`updated-${feed.id}`}>-</Text>
       ),
       // Actions column
-      <ButtonGroup key={`actions-${feed.id}`}>
+      <InlineStack gap="200" key={`actions-${feed.id}`}>
         <Button
           icon={RefreshIcon}
           variant="plain"
@@ -326,7 +325,7 @@ export default function FeedsIndex() {
         >
           Delete
         </Button>
-      </ButtonGroup>
+      </InlineStack>
     ];
   });
 
