@@ -10,9 +10,9 @@ import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
  *    schedule = "0 2 * * *"  # Run daily at 2 AM UTC
  * 
  * Alternative schedules:
- * - "0 */6 * * *"    # Every 6 hours
- * - "0 0 * * 0"      # Weekly on Sunday at midnight
- * - "0 */2 * * *"    # Every 2 hours
+ * - "0 0,6,12,18 * * *"  # Every 6 hours
+ * - "0 0 * * 0"          # Weekly on Sunday at midnight
+ * - "0 0,2,4,6,8,10,12,14,16,18,20,22 * * *"  # Every 2 hours
  * 
  * To manually trigger: Deploy this function and use Netlify's Functions UI
  */
