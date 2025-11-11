@@ -52,11 +52,4 @@ export class ShopRepository {
       where: { myshopifyDomain }
     });
   }
-
-  static async updatePlan(myshopifyDomain: string, plan: string): Promise<Shop> {
-    return db.shop.update({
-      where: { myshopifyDomain },
-      data: { plan }
-    });
-  }
 }

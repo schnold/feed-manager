@@ -10,7 +10,6 @@ import { EnhancedTabbedFeedForm } from "../components/EnhancedTabbedFeedForm";
 import { Page, Layout, Banner } from "@shopify/polaris";
 import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
 import { randomUUID } from "crypto";
-import { canCreateFeed, getPlanConfig } from "../config/plans.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -133,22 +132,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return redirect("/app/feeds");
     }
 
-    // Handle create action - validate plan limits first
-    const currentFeeds = await FeedRepository.findByShopId(shop.id);
-    const currentFeedCount = currentFeeds.length;
-    
-    // Check if shop can create more feeds based on their plan
-    if (!canCreateFeed(shop.plan, currentFeedCount)) {
-      const planConfig = getPlanConfig(shop.plan);
-      const maxFeeds = planConfig.maxFeeds === -1 ? 'unlimited' : planConfig.maxFeeds;
-      return json(
-        { 
-          error: `You have reached the maximum number of feeds (${maxFeeds}) for your ${planConfig.name} plan. Please upgrade your plan to create more feeds.` 
-        }, 
-        { status: 403 }
-      );
-    }
-
+    // Handle create action
     const token = randomUUID();
 
     // Create feed with placeholder values first

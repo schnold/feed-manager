@@ -4,12 +4,12 @@ import { vitePlugin as remix } from '@remix-run/dev'
 export default defineConfig({
   plugins: [
     remix({
-      ssr: true, // Enable SSR to test server-side modules
+      ssr: false,
     }),
   ],
   test: {
     globals: true,
-    environment: 'node', // Use node environment for server-side tests
+    environment: 'jsdom',
     setupFiles: ['./test-setup.ts'],
   },
 })
