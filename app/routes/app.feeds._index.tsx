@@ -411,14 +411,39 @@ export default function FeedsIndex() {
               </Card>
             )}
 
-            {feeds.length >= maxFeeds && maxFeeds !== Infinity && (
-              <Card>
-                <Text as="p" variant="bodyMd">
-                  You now have {feeds.length} feeds which is the maximum ({maxFeeds}) on your current plan.{' '}
-                  <Link to="/app/choose-plan">Upgrade in order to add more feeds</Link>
+            {/* Feed usage information */}
+            <Card>
+              <BlockStack gap="200">
+                <Text as="h3" variant="headingMd">
+                  Feed Usage
                 </Text>
-              </Card>
-            )}
+                <Text as="p" variant="bodyMd">
+                  You are using <Text as="span" fontWeight="semibold">{feeds.length}</Text> out of{' '}
+                  {maxFeeds === Infinity ? (
+                    <Text as="span" fontWeight="semibold">unlimited</Text>
+                  ) : (
+                    <Text as="span" fontWeight="semibold">{maxFeeds}</Text>
+                  )}{' '}
+                  feeds available on your current plan.
+                </Text>
+                {feeds.length >= maxFeeds && maxFeeds !== Infinity && (
+                  <Text as="p" variant="bodyMd" tone="warning">
+                    You've reached the maximum number of feeds for your plan.{' '}
+                    <Link to="/app/choose-plan">Upgrade your plan</Link> to add more feeds.
+                  </Text>
+                )}
+                {feeds.length < maxFeeds && maxFeeds !== Infinity && (
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    You can create {maxFeeds - feeds.length} more feed{maxFeeds - feeds.length !== 1 ? 's' : ''} on your current plan.
+                  </Text>
+                )}
+                {maxFeeds === Infinity && (
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Your plan includes unlimited feeds.
+                  </Text>
+                )}
+              </BlockStack>
+            </Card>
           </BlockStack>
         </Layout.Section>
       </Layout>
