@@ -47,6 +47,13 @@ export class ShopRepository {
     });
   }
 
+  static async updatePlan(myshopifyDomain: string, plan: string): Promise<Shop> {
+    return db.shop.update({
+      where: { myshopifyDomain },
+      data: { plan }
+    });
+  }
+
   static async delete(myshopifyDomain: string): Promise<void> {
     await db.shop.delete({
       where: { myshopifyDomain }

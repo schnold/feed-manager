@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import {
   Page,
@@ -14,8 +14,9 @@ import {
   Grid,
   Banner
 } from "@shopify/polaris";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useActionData } from "@remix-run/react";
+import { useAppBridge } from "@shopify/app-bridge-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -139,8 +140,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Check if we got a confirmation URL
     const confirmationUrl = jsonResponse.data?.appSubscriptionCreate?.confirmationUrl;
     if (confirmationUrl) {
-      console.log('Subscription created successfully, redirecting to:', confirmationUrl);
-      return redirect(confirmationUrl);
+      console.log('Subscription created successfully, confirmation URL:', confirmationUrl);
+      // Return the confirmation URL to the client so it can be opened properly
+      // For embedded apps, we need to break out of the iframe
+      return json({ 
+        success: true,
+        confirmationUrl: confirmationUrl
+      });
     }
 
     // If no confirmation URL and no errors, something unexpected happened
@@ -161,9 +167,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function ChoosePlan() {
   const actionData = useActionData<typeof action>();
+  const app = useAppBridge();
   const [showYearly, setShowYearly] = useState(false);
   const [discountCode, setDiscountCode] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<string>("grow");
+
+  // Handle redirect to confirmation URL when subscription is created
+  useEffect(() => {
+    if (actionData?.success && actionData?.confirmationUrl) {
+      // For embedded apps, we need to break out of the iframe
+      // Use window.top to redirect the parent window
+      if (typeof window !== 'undefined' && window.top) {
+        try {
+          window.top.location.href = actionData.confirmationUrl;
+        } catch (e) {
+          // If we can't access window.top (cross-origin), open in new window
+          window.open(actionData.confirmationUrl, '_top');
+        }
+      } else {
+        // Fallback if window.top is not available
+        window.location.href = actionData.confirmationUrl;
+      }
+    }
+  }, [actionData]);
 
   // Original yearly prices before 25% discount
   const originalYearlyPrices = {
@@ -229,6 +255,13 @@ export default function ChoosePlan() {
   return (
     <Page title="Choose Your Plan">
       <BlockStack gap="500">
+        {actionData?.success && actionData?.confirmationUrl && (
+          <Banner tone="info" title="Redirecting to checkout...">
+            <Text as="p" variant="bodyMd">
+              Please wait while we redirect you to complete your subscription.
+            </Text>
+          </Banner>
+        )}
         {actionData?.error && (
           <Banner tone="critical" title={actionData.error}>
             {actionData.details && (

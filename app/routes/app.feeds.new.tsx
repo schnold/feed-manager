@@ -10,9 +10,22 @@ import { EnhancedTabbedFeedForm } from "../components/EnhancedTabbedFeedForm";
 import { Page, Layout, Banner } from "@shopify/polaris";
 import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
 import { randomUUID } from "crypto";
+import { getCurrentSubscription, getMaxFeedsForPlan } from "../services/shopify/subscription.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
+
+  // Sync shop plan with actual subscription
+  const shop = await ShopRepository.findByDomain(session.shop) || await ShopRepository.upsert({
+    myshopifyDomain: session.shop,
+    accessToken: session.accessToken
+  });
+  
+  const subscription = await getCurrentSubscription(request);
+  if (subscription && subscription.plan !== shop.plan) {
+    await ShopRepository.updatePlan(session.shop, subscription.plan);
+    shop.plan = subscription.plan;
+  }
 
   // Check if this is edit mode by looking for feedId in query params
   const url = new URL(request.url);
@@ -26,11 +39,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     // If feedId is provided, load the feed data for editing
     if (feedId) {
-      const shop = await ShopRepository.findByDomain(session.shop);
-      if (!shop) {
-        throw new Response("Shop not found", { status: 404 });
-      }
-
       const feed = await FeedRepository.findById(feedId);
       if (!feed) {
         throw new Response("Feed not found", { status: 404 });
@@ -73,6 +81,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     myshopifyDomain: session.shop,
     accessToken: session.accessToken
   });
+
+  // Get current subscription from Shopify and sync plan
+  const subscription = await getCurrentSubscription(request);
+  if (subscription && subscription.plan !== shop.plan) {
+    // Update shop plan to match actual subscription
+    await ShopRepository.updatePlan(session.shop, subscription.plan);
+    shop.plan = subscription.plan;
+  }
 
   const formData = await request.formData();
   const actionType = formData.get("_action") as string;
@@ -132,7 +148,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return redirect("/app/feeds");
     }
 
-    // Handle create action
+    // Handle create action - check feed limit
+    const maxFeeds = getMaxFeedsForPlan(shop.plan);
+    const currentFeeds = await FeedRepository.findByShopId(shop.id);
+    
+    if (currentFeeds.length >= maxFeeds && maxFeeds !== Infinity) {
+      return json({ 
+        error: `You have reached the maximum number of feeds (${maxFeeds}) for your current plan. Please upgrade to add more feeds.` 
+      }, { status: 403 });
+    }
+
     const token = randomUUID();
 
     // Create feed with placeholder values first
@@ -208,6 +233,15 @@ export default function NewFeed() {
         title={isEdit ? `Edit Feed: ${feed?.name}` : "Create New Feed"}
         breadcrumbs={[{ content: "Feeds", url: "/app/feeds" }]}
       >
+        {actionData?.error && (
+          <Layout>
+            <Layout.Section>
+              <Banner tone="critical" title="Error">
+                {actionData.error}
+              </Banner>
+            </Layout.Section>
+          </Layout>
+        )}
         <EnhancedTabbedFeedForm
           locales={locales}
           locations={locations}

@@ -8,6 +8,7 @@ import { FeedRepository } from "../db/repositories/feed.server";
 import { deleteXmlFromS3 } from "../services/storage/s3.server";
 import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
 import { getCurrencyDisplay } from "../utils/currency";
+import { getCurrentSubscription, getMaxFeedsForPlan } from "../services/shopify/subscription.server";
 import {
   Page,
   Layout,
@@ -42,9 +43,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     accessToken: session.accessToken
   });
 
-  const feeds = await FeedRepository.findByShopId(shop.id);
+  // Get current subscription from Shopify and sync plan
+  const subscription = await getCurrentSubscription(request);
+  if (subscription && subscription.plan !== shop.plan) {
+    // Update shop plan to match actual subscription
+    await ShopRepository.updatePlan(session.shop, subscription.plan);
+    shop.plan = subscription.plan;
+  }
 
-  return json({ feeds, shop });
+  const feeds = await FeedRepository.findByShopId(shop.id);
+  const maxFeeds = getMaxFeedsForPlan(shop.plan);
+
+  return json({ feeds, shop, maxFeeds });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -117,7 +127,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function FeedsIndex() {
-  const { feeds: initialFeeds } = useLoaderData<typeof loader>();
+  const { feeds: initialFeeds, maxFeeds } = useLoaderData<typeof loader>();
   const [feeds, setFeeds] = useState(initialFeeds);
   const [copiedFeedId, setCopiedFeedId] = useState<string | null>(null);
   const fetcher = useFetcher();
@@ -401,10 +411,10 @@ export default function FeedsIndex() {
               </Card>
             )}
 
-            {feeds.length > 0 && (
+            {feeds.length >= maxFeeds && maxFeeds !== Infinity && (
               <Card>
                 <Text as="p" variant="bodyMd">
-                  You now have {feeds.length} feeds which is the maximum on your current plan.{' '}
+                  You now have {feeds.length} feeds which is the maximum ({maxFeeds}) on your current plan.{' '}
                   <Link to="/app/choose-plan">Upgrade in order to add more feeds</Link>
                 </Text>
               </Card>
