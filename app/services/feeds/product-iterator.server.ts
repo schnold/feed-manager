@@ -59,7 +59,7 @@ export async function* iterateProducts(params: IteratorParams) {
     `;
 
     // Make direct GraphQL request to Shopify Admin API
-    const response = await fetch(`https://${shopDomain}/admin/api/2025-01/graphql.json`, {
+    const response = await fetch(`https://${shopDomain}/admin/api/2025-04/graphql.json`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

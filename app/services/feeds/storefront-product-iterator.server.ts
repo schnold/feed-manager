@@ -85,7 +85,7 @@ export async function* iterateProductsWithStorefront(params: StorefrontIteratorP
 
     try {
       // Make direct GraphQL request to Shopify Storefront API
-      const response = await fetch(`https://${shopDomain}/api/2025-01/graphql.json`, {
+      const response = await fetch(`https://${shopDomain}/api/2025-04/graphql.json`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

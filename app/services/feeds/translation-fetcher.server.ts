@@ -87,7 +87,7 @@ async function fetchTranslatedProductsBatch(
   `;
 
   try {
-    const response = await fetch(`https://${shopDomain}/api/2025-01/graphql.json`, {
+    const response = await fetch(`https://${shopDomain}/api/2025-04/graphql.json`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -171,7 +171,7 @@ export async function fetchTranslatedProductsAdmin(
           }
         `;
 
-        const response = await fetch(`https://${shopDomain}/admin/api/2025-01/graphql.json`, {
+        const response = await fetch(`https://${shopDomain}/admin/api/2025-04/graphql.json`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
