@@ -51,8 +51,14 @@ try {
     authPathPrefix: "/auth",
     sessionStorage: new PrismaSessionStorage(prisma),
     distribution: AppDistribution.AppStore,
+    // Explicitly set isEmbeddedApp to true for immediate authentication
+    // This works with unstable_newEmbeddedAuthStrategy to enable:
+    // - Shopify managed installation (no redirects)
+    // - Token exchange (immediate authentication)
+    // - Seamless sign-up using Shopify credentials
+    isEmbeddedApp: true,
     future: {
-      unstable_newEmbeddedAuthStrategy: true,
+      unstable_newEmbeddedAuthStrategy: true, // Enables token exchange and Shopify managed installation
       removeRest: true,
     },
     ...(process.env.SHOP_CUSTOM_DOMAIN
