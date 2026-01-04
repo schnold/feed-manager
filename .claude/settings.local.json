@@ -19,7 +19,13 @@
       "Bash(test:*)",
       "Bash(git rm:*)",
       "Bash(git check-ignore:*)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(dir \"%APPDATA%\\\\Cursor\")",
+      "Bash(dir \"%LOCALAPPDATA%\\\\Cursor\")",
+      "Bash(where /R \"%USERPROFILE%\" mcp.json)",
+      "Bash(findstr:*)",
+      "Bash(dir \"%USERPROFILE%\\\\.cursor\")",
+      "WebFetch(domain:shopify.dev)"
     ],
     "deny": []
   }

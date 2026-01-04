@@ -1,5 +1,8 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
+import db from "../db.server";
+import { ShopRepository } from "../db/repositories/shop.server";
+import { FeedRepository } from "../db/repositories/feed.server";
 
 /**
  * Mandatory compliance webhook handler for public apps
@@ -46,7 +49,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       case "customers/data_request":
         // Handle customer data request
         // The customer has requested to view their stored data
-        // You should provide the customer's data if you store any
         console.log("Customer data request:", {
           shop_id: webhookData.shop_id,
           shop_domain: webhookData.shop_domain,
@@ -54,11 +56,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           orders_requested: webhookData.orders_requested,
           data_request: webhookData.data_request,
         });
-        
-        // TODO: If your app stores customer data, retrieve and provide it here
-        // This app (Feed Manager) primarily handles product feeds, so minimal customer data is stored
-        // For compliance, you may need to export customer data if requested
-        // Note: You have 30 days to complete this action
+
+        // This app (Feed Manager) does not store customer personal data
+        // The app only processes product catalog data for feed generation
+        // If customer data is stored in the future, implement retrieval here
+        console.log(`No customer data stored for customer ${webhookData.customer?.id} in shop ${webhookData.shop_domain}`);
         break;
 
       case "CUSTOMERS_REDACT":
@@ -71,11 +73,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           customer: webhookData.customer,
           orders_to_redact: webhookData.orders_to_redact,
         });
-        
-        // TODO: If your app stores customer data, delete it here
-        // This app (Feed Manager) primarily handles product feeds, so minimal customer data is stored
-        // For compliance, delete any customer-related data you store
-        // Note: You have 30 days to complete this action (unless legally required to retain)
+
+        // This app (Feed Manager) does not store customer personal data
+        // The app only processes product catalog data for feed generation
+        // If customer data is stored in the future, implement deletion here
+        console.log(`No customer data to redact for customer ${webhookData.customer?.id} in shop ${webhookData.shop_domain}`);
         break;
 
       case "SHOP_REDACT":
@@ -86,11 +88,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           shop_id: webhookData.shop_id,
           shop_domain: webhookData.shop_domain,
         });
-        
-        // TODO: If your app stores shop-specific data, delete it here
-        // Note: Session data is already handled by app/uninstalled webhook
-        // This app (Feed Manager) stores feed configurations - consider cleaning up if needed
-        // For compliance, delete any shop-specific data you store
+
+        try {
+          const shopDomain = webhookData.shop_domain;
+
+          // Find the shop by domain
+          const shopRecord = await ShopRepository.findByDomain(shopDomain);
+
+          if (shopRecord) {
+            console.log(`Deleting all data for shop: ${shopDomain}`);
+
+            // Delete all feeds for this shop (cascade deletes mappings, filters, schedules, runs, assets)
+            const feeds = await FeedRepository.findByShopId(shopRecord.id);
+            for (const feed of feeds) {
+              await FeedRepository.deleteWithRelations(feed.id);
+              console.log(`Deleted feed ${feed.id} (${feed.name}) for shop ${shopDomain}`);
+            }
+
+            // Delete all sessions for this shop
+            await db.session.deleteMany({
+              where: { shop: shopDomain }
+            });
+            console.log(`Deleted sessions for shop ${shopDomain}`);
+
+            // Delete the shop record
+            await ShopRepository.delete(shopDomain);
+            console.log(`Deleted shop record for ${shopDomain}`);
+
+            console.log(`Successfully redacted all data for shop ${shopDomain}`);
+          } else {
+            console.log(`Shop ${shopDomain} not found in database - may have been already deleted`);
+          }
+        } catch (error) {
+          console.error(`Error redacting shop data for ${webhookData.shop_domain}:`, error);
+          // Still return 200 to acknowledge receipt
+        }
         break;
 
       default:
