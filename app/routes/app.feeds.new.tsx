@@ -10,19 +10,21 @@ import { EnhancedTabbedFeedForm } from "../components/EnhancedTabbedFeedForm";
 import { Page, Layout, Banner } from "@shopify/polaris";
 import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
 import { randomUUID } from "crypto";
-import { getCurrentSubscription, getMaxFeedsForPlan } from "../services/shopify/subscription.server";
+import { requireActivePlan, canCreateFeed, getCurrentSubscription, getMaxFeedsForPlan } from "../services/shopify/subscription.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  // SECURITY: Require active subscription (minimum BASE plan)
+  const subscription = await requireActivePlan(request, 'base');
+
   const { session } = await authenticate.admin(request);
 
-  // Sync shop plan with actual subscription
   const shop = await ShopRepository.findByDomain(session.shop) || await ShopRepository.upsert({
     myshopifyDomain: session.shop,
     accessToken: session.accessToken
   });
-  
-  const subscription = await getCurrentSubscription(request);
-  if (subscription && subscription.plan !== shop.plan) {
+
+  // Sync shop plan with subscription if needed
+  if (subscription.plan !== shop.plan) {
     await ShopRepository.updatePlan(session.shop, subscription.plan);
     shop.plan = subscription.plan;
   }
@@ -75,6 +77,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  // SECURITY: Require active subscription
+  const subscription = await requireActivePlan(request, 'base');
+
   const { session } = await authenticate.admin(request);
 
   const shop = await ShopRepository.upsert({
@@ -82,10 +87,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     accessToken: session.accessToken
   });
 
-  // Get current subscription from Shopify and sync plan
-  const subscription = await getCurrentSubscription(request);
-  if (subscription && subscription.plan !== shop.plan) {
-    // Update shop plan to match actual subscription
+  // Sync shop plan with subscription if needed
+  if (subscription.plan !== shop.plan) {
     await ShopRepository.updatePlan(session.shop, subscription.plan);
     shop.plan = subscription.plan;
   }
@@ -148,13 +151,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return redirect("/app/feeds");
     }
 
-    // Handle create action - check feed limit
-    const maxFeeds = getMaxFeedsForPlan(shop.plan);
-    const currentFeeds = await FeedRepository.findByShopId(shop.id);
-    
-    if (currentFeeds.length >= maxFeeds && maxFeeds !== Infinity) {
-      return json({ 
-        error: `You have reached the maximum number of feeds (${maxFeeds}) for your current plan. Please upgrade to add more feeds.` 
+    // SECURITY: Check feed creation limit before allowing new feed
+    const feedCheck = await canCreateFeed(request);
+
+    if (!feedCheck.allowed) {
+      return json({
+        error: `Feed limit reached. You have ${feedCheck.currentCount} of ${feedCheck.maxAllowed} feeds on the ${feedCheck.plan.toUpperCase()} plan. Please upgrade to create more feeds.`
       }, { status: 403 });
     }
 

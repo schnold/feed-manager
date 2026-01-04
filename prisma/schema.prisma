@@ -35,13 +35,39 @@ model Session {
 /// App data models
 
 model Shop {
-  id              String   @id @default(cuid())
-  myshopifyDomain String   @unique
+  id              String         @id @default(cuid())
+  myshopifyDomain String         @unique
   accessToken     String
-  plan            String   @default("basic")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  plan            String         @default("basic")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   feeds           Feed[]
+  subscriptions   Subscription[]
+}
+
+model Subscription {
+  id                 String    @id @default(cuid())
+  shopId             String
+  shop               Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shopifySubscriptionId String @unique // Shopify's subscription ID (gid://shopify/AppSubscription/...)
+  name               String    // Plan name (e.g., "GROW Plan")
+  status             String    // ACTIVE, CANCELLED, EXPIRED, PENDING, etc.
+  planId             String    // Internal plan ID (base, mid, basic, grow, pro, premium)
+  billingInterval    String    // EVERY_30_DAYS or ANNUAL
+  price              Float     // Price in EUR
+  currencyCode       String    @default("EUR")
+  isTest             Boolean   @default(false) // Whether this is a test subscription
+  trialDays          Int?      // Number of trial days
+  trialEndsAt        DateTime? // When trial ends
+  currentPeriodStart DateTime? // Current billing period start
+  currentPeriodEnd   DateTime? // Current billing period end
+  cancelledAt        DateTime? // When subscription was cancelled
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([shopId])
+  @@index([shopifySubscriptionId])
+  @@index([status])
 }
 
 model Feed {

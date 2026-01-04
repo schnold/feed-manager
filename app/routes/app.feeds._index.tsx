@@ -8,7 +8,7 @@ import { FeedRepository } from "../db/repositories/feed.server";
 import { deleteXmlFromS3 } from "../services/storage/s3.server";
 import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
 import { getCurrencyDisplay } from "../utils/currency";
-import { getCurrentSubscription, getMaxFeedsForPlan } from "../services/shopify/subscription.server";
+import { requireActivePlan, getCurrentSubscription, getMaxFeedsForPlan } from "../services/shopify/subscription.server";
 import {
   Page,
   Layout,
@@ -36,6 +36,10 @@ import {
 } from "@shopify/polaris-icons";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  // SECURITY: Require active subscription (minimum BASE plan)
+  // This will throw and redirect to /app/choose-plan if no active subscription
+  const subscription = await requireActivePlan(request, 'base');
+
   const { session } = await authenticate.admin(request);
 
   const shop = await ShopRepository.upsert({
@@ -43,21 +47,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     accessToken: session.accessToken
   });
 
-  // Get current subscription from Shopify and sync plan
-  const subscription = await getCurrentSubscription(request);
-  if (subscription && subscription.plan !== shop.plan) {
-    // Update shop plan to match actual subscription
+  // Sync shop plan with subscription if needed
+  if (subscription.plan !== shop.plan) {
     await ShopRepository.updatePlan(session.shop, subscription.plan);
     shop.plan = subscription.plan;
   }
 
   const feeds = await FeedRepository.findByShopId(shop.id);
-  const maxFeeds = getMaxFeedsForPlan(shop.plan);
+  const maxFeeds = getMaxFeedsForPlan(subscription.plan);
+  const canCreateMoreFeeds = feeds.length < maxFeeds;
 
-  return json({ feeds, shop, maxFeeds });
+  return json({
+    feeds,
+    shop,
+    maxFeeds,
+    canCreateMoreFeeds,
+    currentPlan: subscription.plan
+  });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  // SECURITY: Require active subscription
+  await requireActivePlan(request, 'base');
+
   const { session } = await authenticate.admin(request);
 
   const formData = await request.formData();
@@ -127,7 +139,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function FeedsIndex() {
-  const { feeds: initialFeeds, maxFeeds } = useLoaderData<typeof loader>();
+  const { feeds: initialFeeds, maxFeeds, canCreateMoreFeeds, currentPlan } = useLoaderData<typeof loader>();
   const [feeds, setFeeds] = useState(initialFeeds);
   const [copiedFeedId, setCopiedFeedId] = useState<string | null>(null);
   const fetcher = useFetcher();
@@ -352,14 +364,38 @@ export default function FeedsIndex() {
   return (
     <Page
       title="Feed Manager"
-      primaryAction={{
-        content: "Create Feed",
-        url: "/app/feeds/new"
-      }}
+      primaryAction={
+        canCreateMoreFeeds
+          ? {
+              content: "Create Feed",
+              url: "/app/feeds/new"
+            }
+          : {
+              content: "Upgrade Plan",
+              url: "/app/choose-plan"
+            }
+      }
     >
       <Layout>
         <Layout.Section>
           <BlockStack gap="500">
+            {/* SECURITY: Show upgrade banner when feed limit reached */}
+            {!canCreateMoreFeeds && maxFeeds !== Infinity && (
+              <Banner
+                title="Feed Limit Reached"
+                tone="warning"
+                action={{
+                  content: "Upgrade Plan",
+                  url: "/app/choose-plan"
+                }}
+              >
+                <Text as="p" variant="bodyMd">
+                  You've reached the maximum of {maxFeeds} feeds on your {currentPlan.toUpperCase()} plan.
+                  Upgrade to create more feeds and unlock additional features.
+                </Text>
+              </Banner>
+            )}
+
             <Card>
               <BlockStack gap="400">
                 <Text as="p" variant="bodyMd">

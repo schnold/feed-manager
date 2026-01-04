@@ -3,9 +3,24 @@ import {
   ApiVersion,
   AppDistribution,
   shopifyApp,
+  BillingInterval,
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+
+// Define billing plan constants for type safety
+export const PLAN_BASE_MONTHLY = 'BASE_MONTHLY';
+export const PLAN_BASE_YEARLY = 'BASE_YEARLY';
+export const PLAN_MID_MONTHLY = 'MID_MONTHLY';
+export const PLAN_MID_YEARLY = 'MID_YEARLY';
+export const PLAN_BASIC_MONTHLY = 'BASIC_MONTHLY';
+export const PLAN_BASIC_YEARLY = 'BASIC_YEARLY';
+export const PLAN_GROW_MONTHLY = 'GROW_MONTHLY';
+export const PLAN_GROW_YEARLY = 'GROW_YEARLY';
+export const PLAN_PRO_MONTHLY = 'PRO_MONTHLY';
+export const PLAN_PRO_YEARLY = 'PRO_YEARLY';
+export const PLAN_PREMIUM_MONTHLY = 'PREMIUM_MONTHLY';
+export const PLAN_PREMIUM_YEARLY = 'PREMIUM_YEARLY';
 
 console.log("[shopify.server] Initializing Shopify app configuration...");
 console.log("[shopify.server] Environment check:", {
@@ -60,6 +75,69 @@ try {
     future: {
       unstable_newEmbeddedAuthStrategy: true, // Enables token exchange and Shopify managed installation
       removeRest: true,
+    },
+    // Billing configuration - defines all available plans
+    billing: {
+      [PLAN_BASE_MONTHLY]: {
+        amount: 5.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Every30Days,
+      },
+      [PLAN_BASE_YEARLY]: {
+        amount: 45.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Annual,
+      },
+      [PLAN_MID_MONTHLY]: {
+        amount: 14.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Every30Days,
+      },
+      [PLAN_MID_YEARLY]: {
+        amount: 126.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Annual,
+      },
+      [PLAN_BASIC_MONTHLY]: {
+        amount: 21.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Every30Days,
+      },
+      [PLAN_BASIC_YEARLY]: {
+        amount: 189.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Annual,
+      },
+      [PLAN_GROW_MONTHLY]: {
+        amount: 27.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Every30Days,
+      },
+      [PLAN_GROW_YEARLY]: {
+        amount: 243.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Annual,
+      },
+      [PLAN_PRO_MONTHLY]: {
+        amount: 59.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Every30Days,
+      },
+      [PLAN_PRO_YEARLY]: {
+        amount: 531.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Annual,
+      },
+      [PLAN_PREMIUM_MONTHLY]: {
+        amount: 134.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Every30Days,
+      },
+      [PLAN_PREMIUM_YEARLY]: {
+        amount: 1206.0,
+        currencyCode: "EUR",
+        interval: BillingInterval.Annual,
+      },
     },
     ...(process.env.SHOP_CUSTOM_DOMAIN
       ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
