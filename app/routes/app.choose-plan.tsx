@@ -64,11 +64,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   console.log(`[choose-plan] Creating subscription for shop ${session.shop}, plan: ${planKey}, test: ${isTest}`);
 
   try {
+    // billing.request() throws a redirect Response to Shopify's confirmation page
+    // After approval, Shopify redirects back using the embedded app URL
+    // Using host parameter to ensure proper embedded app redirect
+    const url = new URL(request.url);
+    const shop = session.shop;
+    const host = url.searchParams.get("host");
+
+    let returnUrl = `${process.env.SHOPIFY_APP_URL}/app/billing-callback`;
+    if (shop) {
+      returnUrl += `?shop=${shop}`;
+      if (host) {
+        returnUrl += `&host=${host}`;
+      }
+    }
+
+    console.log(`[choose-plan] Using returnUrl: ${returnUrl}`);
+
     await billing.request({
       plan: planKey as any,
       isTest: isTest,
-      returnUrl: `${process.env.SHOPIFY_APP_URL}/app/billing-callback`,
+      returnUrl: returnUrl,
     });
+
+    // This code is never reached because billing.request() always throws a redirect
+    console.error('[choose-plan] UNEXPECTED: billing.request() did not throw redirect');
+    return json({
+      error: "Unexpected billing flow",
+      details: "The billing request did not redirect as expected"
+    }, { status: 500 });
 
   } catch (error) {
     if (error instanceof Response) {
