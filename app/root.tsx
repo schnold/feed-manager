@@ -30,10 +30,7 @@ export default function App() {
         {apiKey && (
           <meta name="shopify-api-key" content={apiKey} />
         )}
-        {/* App Bridge script for Web Vitals tracking and admin performance monitoring */}
-        {/* This is required for Built for Shopify status and Core Web Vitals tracking */}
-        {/* The script must be loaded before any other scripts that depend on it */}
-        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" />
+        {/* App Bridge script is automatically injected by AppProvider from shopify-app-remix/react */}
         <link rel="preconnect" href="https://cdn.shopify.com/" />
         <Meta />
         <Links />
@@ -69,9 +66,7 @@ export function ErrorBoundary() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
-        {/* App Bridge script for Web Vitals tracking and admin performance monitoring */}
         {/* Note: API key meta tag not included in error boundary as it's a client component */}
-        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" />
         <title>Error - Feed Manager</title>
         <Meta />
         <Links />

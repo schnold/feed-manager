@@ -7,9 +7,13 @@ import { authenticate } from "../shopify.server";
 import { AppNavigation } from "../components/AppNavigation";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  return {
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    shop: session.shop,
+    host: new URL(request.url).searchParams.get("host") || "",
+  };
 };
 
 export default function App() {

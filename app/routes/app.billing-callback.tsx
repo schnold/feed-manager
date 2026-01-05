@@ -9,27 +9,14 @@ import { PLAN_FEATURES } from "../services/shopify/subscription.server";
  * It verifies the subscription was approved and saves it to the database
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { admin, session, redirect: shopifyRedirect } = await authenticate.admin(request);
 
-  // Extract and preserve shop, host, and charge_id for App Bridge initialization after redirect
   const url = new URL(request.url);
-  const shopDomain = url.searchParams.get("shop");
-  const host = url.searchParams.get("host");
   const chargeId = url.searchParams.get("charge_id");
-
-  console.log(`[billing-callback] Processing billing callback for shop: ${shopDomain}, host: ${host}, charge_id: ${chargeId}`);
-
-  // Helper to build redirect URL with essential App Bridge parameters
-  const getRedirectUrl = (path: string) => {
-    const redirectUrl = new URL(path, process.env.SHOPIFY_APP_URL);
-    if (shopDomain) redirectUrl.searchParams.set("shop", shopDomain);
-    if (host) redirectUrl.searchParams.set("host", host);
-    return redirectUrl.toString();
-  };
 
   if (!chargeId) {
     console.error("[billing-callback] No charge_id provided in callback URL");
-    return redirect(getRedirectUrl("/app/choose-plan?error=no_charge_id"));
+    return shopifyRedirect("/app/choose-plan?error=no_charge_id");
   }
 
   try {
@@ -66,7 +53,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const response = await admin.graphql(query, {
       variables: {
-        id: chargeId,
+        id: `gid://shopify/AppSubscription/${chargeId}`,
       },
     });
 
@@ -74,7 +61,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     if (data.errors || !data.data?.node) {
       console.error("[billing-callback] GraphQL errors or subscription not found:", data.errors || "No node data");
-      return redirect(getRedirectUrl("/app/choose-plan?error=graphql_error"));
+      return shopifyRedirect("/app/choose-plan?error=graphql_error");
     }
 
     const subscription = data.data.node;
@@ -89,13 +76,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // SECURITY STEP 2: Verify subscription is ACTIVE
     if (subscription.status !== "ACTIVE") {
       console.warn(`[billing-callback] Subscription ${chargeId} is not active. Status: ${subscription.status}`);
-      return redirect(getRedirectUrl("/app/choose-plan?error=subscription_not_active"));
+      return shopifyRedirect("/app/choose-plan?error=subscription_not_active");
     }
 
     // SECURITY STEP 3: In production, ensure it's not a test subscription
     if (process.env.NODE_ENV === 'production' && subscription.test) {
       console.error("[billing-callback] Test subscription in production environment");
-      return redirect(getRedirectUrl("/app/choose-plan?error=test_in_production"));
+      return shopifyRedirect("/app/choose-plan?error=test_in_production");
     }
 
     // Extract pricing details
@@ -104,7 +91,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     if (!pricingDetails || !pricingDetails.price) {
       console.error("[billing-callback] No pricing details found");
-      return redirect(getRedirectUrl("/app/choose-plan?error=no_pricing"));
+      return shopifyRedirect("/app/choose-plan?error=no_pricing");
     }
 
     const price = parseFloat(pricingDetails.price.amount);
@@ -207,14 +194,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     console.log(`[billing-callback] Successfully processed subscription for ${session.shop}. Plan: ${planId}`);
 
-    // Redirect to main app (feeds page) with App Bridge params
-    return redirect(getRedirectUrl("/app/feeds?subscription=success"));
+    // Redirect to main app (feeds page) using Shopify's specialized redirect helper
+    // This helper preserves shop/host params and handles embedded app redirects correctly
+    return shopifyRedirect("/app/feeds?subscription=success");
 
   } catch (error) {
     console.error("[billing-callback] Error processing billing callback:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error("[billing-callback] Error details:", errorMessage);
 
-    return redirect(getRedirectUrl("/app/choose-plan?error=callback_failed"));
+    return shopifyRedirect("/app/choose-plan?error=callback_failed");
   }
 };
