@@ -70,11 +70,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       returnUrl: `${process.env.SHOPIFY_APP_URL}/app/billing-callback`,
     });
 
-    return json({
-      error: "Unexpected error",
-      details: "Failed to initiate billing request"
-    }, { status: 500 });
-
   } catch (error) {
     if (error instanceof Response) {
       throw error;
