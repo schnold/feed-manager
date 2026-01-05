@@ -11,8 +11,12 @@ export async function shouldUseTestCharges(request: Request): Promise<boolean> {
   try {
     const { admin, session } = await authenticate.admin(request);
 
-    // ALWAYS use test mode in development environment
-    if (process.env.NODE_ENV !== 'production') {
+    // Strictly disable test mode in production for non-dev stores
+    if (process.env.NODE_ENV === 'production') {
+      // We must check if it's a dev store before deciding
+      // If we can't determine, we default to false (safe for production billing)
+      console.log(`[billing] Production environment detected, checking shop type...`);
+    } else {
       console.log(`[billing] Test mode: ON (development environment)`);
       return true;
     }
