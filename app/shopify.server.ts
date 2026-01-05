@@ -65,7 +65,7 @@ try {
     appUrl: process.env.SHOPIFY_APP_URL,
     authPathPrefix: "/auth",
     sessionStorage: new PrismaSessionStorage(prisma),
-    distribution: AppDistribution.AppStore,
+    distribution: AppDistribution.SingleMerchant,
     // Explicitly set isEmbeddedApp to true for immediate authentication
     // This works with unstable_newEmbeddedAuthStrategy to enable:
     // - Shopify managed installation (no redirects)
@@ -73,7 +73,9 @@ try {
     // - Seamless sign-up using Shopify credentials
     isEmbeddedApp: true,
     future: {
-      unstable_newEmbeddedAuthStrategy: true, // Enables token exchange and Shopify managed installation
+      // Use new auth strategy by default, but allow disabling via env var
+      // Set USE_LEGACY_AUTH=true in environment to use old OAuth flow if needed
+      unstable_newEmbeddedAuthStrategy: process.env.USE_LEGACY_AUTH !== 'true',
       removeRest: true,
     },
     // Billing configuration - defines all available plans

@@ -56,6 +56,7 @@ export async function getCurrentSubscription(request: Request): Promise<Subscrip
 /**
  * SECURITY: Require an active subscription with minimum plan level
  * Throws a Response if requirements are not met
+ * If no subscription exists, redirects to plan selection page
  */
 export async function requireActivePlan(
   request: Request,
@@ -85,11 +86,12 @@ export async function requireActivePlan(
   }
 
   if (shop.subscriptions.length === 0) {
-    console.log(`[subscription] No active subscription for ${session.shop}`);
-    throw new Response("No active subscription", {
-      status: 403,
+    console.log(`[subscription] No active subscription for ${session.shop}, redirecting to plan selection`);
+    // Instead of 403, redirect to plan selection
+    throw new Response(null, {
+      status: 302,
       headers: {
-        "X-Shopify-Redirect": "/app/choose-plan",
+        "Location": "/app/choose-plan",
       },
     });
   }
