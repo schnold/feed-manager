@@ -199,16 +199,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     // SECURITY STEP 7: Update shop's plan and features
     const basePlanId = planId.replace('_yearly', '');
-    const planFeatures = PLAN_FEATURES[basePlanId] || PLAN_FEATURES['basic'];
+    const planFeatures = PLAN_FEATURES[basePlanId] || PLAN_FEATURES['free'];
 
-    console.log(`[billing-callback] Updating shop with plan: ${planId}, features:`, planFeatures);
+    console.log(`[billing-callback] Updating shop with plan: ${planId}, basePlan: ${basePlanId}, features:`, planFeatures);
 
     const updatedShop = await db.shop.update({
       where: { id: shop.id },
       data: {
         plan: planId,
         features: planFeatures
-      } as any,
+      },
     });
 
     console.log(`[billing-callback] Shop updated successfully:`, {
@@ -216,6 +216,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       domain: updatedShop.myshopifyDomain,
       plan: updatedShop.plan,
       features: updatedShop.features
+    });
+
+    // Verify the update worked by reading back
+    const verifyShop = await db.shop.findUnique({
+      where: { id: shop.id },
+      include: {
+        subscriptions: {
+          where: { status: 'ACTIVE' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    console.log(`[billing-callback] VERIFICATION - Shop after update:`, {
+      plan: verifyShop?.plan,
+      features: verifyShop?.features,
+      activeSubscription: verifyShop?.subscriptions[0] ? {
+        planId: verifyShop.subscriptions[0].planId,
+        status: verifyShop.subscriptions[0].status,
+      } : null
     });
 
     console.log(`[billing-callback] Successfully processed subscription for ${session.shop}. Plan: ${planId}`);

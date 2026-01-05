@@ -39,15 +39,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { session } = await authenticate.admin(request);
 
-  const shop = await ShopRepository.upsert({
-    myshopifyDomain: session.shop,
-    accessToken: session.accessToken
-  });
+  // Get existing shop (should already exist from OAuth/install)
+  let shop = await ShopRepository.findByDomain(session.shop);
 
-  // Sync shop plan with subscription if needed
-  if (subscription.plan !== shop.plan) {
-    await ShopRepository.updatePlan(session.shop, subscription.plan);
-    shop.plan = subscription.plan;
+  if (!shop) {
+    // Shop should exist from OAuth - if not, create with free plan
+    console.warn(`[feeds._index] Shop ${session.shop} not found, creating with free plan`);
+    shop = await ShopRepository.create({
+      myshopifyDomain: session.shop,
+      accessToken: session.accessToken,
+      plan: 'free'
+    });
   }
 
   const feeds = await FeedRepository.findByShopId(shop.id);
