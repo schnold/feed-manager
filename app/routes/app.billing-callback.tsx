@@ -194,15 +194,33 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     console.log(`[billing-callback] Successfully processed subscription for ${session.shop}. Plan: ${planId}`);
 
-    // Redirect to main app (feeds page) using Shopify's specialized redirect helper
-    // This helper preserves shop/host params and handles embedded app redirects correctly
-    return shopifyRedirect("/app/feeds?subscription=success");
+    // Redirect to main app (feeds page) using manual parameter preservation
+    // This is safer than relying on shopifyRedirect when transitioning from Shopify Admin to App
+    const redirectUrl = new URL(`${process.env.SHOPIFY_APP_URL}/app/feeds`);
+    redirectUrl.searchParams.set("subscription", "success");
+
+    // Preserve or fallback to session shop
+    const shopParam = url.searchParams.get("shop") || session.shop;
+    const hostParam = url.searchParams.get("host");
+
+    if (shopParam) redirectUrl.searchParams.set("shop", shopParam);
+    if (hostParam) redirectUrl.searchParams.set("host", hostParam);
+
+    console.log(`[billing-callback] Redirecting to: ${redirectUrl.toString()}`);
+    return redirect(redirectUrl.toString());
 
   } catch (error) {
     console.error("[billing-callback] Error processing billing callback:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error("[billing-callback] Error details:", errorMessage);
 
-    return shopifyRedirect("/app/choose-plan?error=callback_failed");
+    const errorUrl = new URL("/app/choose-plan", process.env.SHOPIFY_APP_URL);
+    errorUrl.searchParams.set("error", "callback_failed");
+    const shopParam = url.searchParams.get("shop");
+    const hostParam = url.searchParams.get("host");
+    if (shopParam) errorUrl.searchParams.set("shop", shopParam);
+    if (hostParam) errorUrl.searchParams.set("host", hostParam);
+
+    return redirect(errorUrl.toString());
   }
 };

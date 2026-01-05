@@ -9,7 +9,9 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import "@shopify/polaris/build/esm/styles.css";
+import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
+
+export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 // Loader to provide API key for App Bridge meta tag
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -26,14 +28,12 @@ export default function App() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <Meta />
+        <Links />
         {/* App Bridge API key meta tag - required for latest App Bridge CDN version */}
         {apiKey && (
           <meta name="shopify-api-key" content={apiKey} />
         )}
-        {/* App Bridge script is automatically injected by AppProvider from shopify-app-remix/react */}
-        <link rel="preconnect" href="https://cdn.shopify.com/" />
-        <Meta />
-        <Links />
       </head>
       <body>
         <Outlet />
@@ -66,7 +66,6 @@ export function ErrorBoundary() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
-        {/* Note: API key meta tag not included in error boundary as it's a client component */}
         <title>Error - Feed Manager</title>
         <Meta />
         <Links />
