@@ -506,26 +506,4 @@ function FiltersPanel({ feed }: { feed: any }) {
   );
 }
 
-function SchedulesPanel({ feed }: { feed: any }) {
-  return (
-    <div>
-      <Text variant="headingSm" as="h3">Generation Schedules</Text>
-      <Text as="p" color="subdued" tone="subdued">Automatically regenerate your feed on a schedule.</Text>
-      <div style={{ marginTop: "16px" }}>
-        {feed.schedules.length > 0 ? (
-          <div>
-            {feed.schedules.map((schedule: any) => (
-              <div key={schedule.id} style={{ padding: "8px", border: "1px solid #e1e1e1", marginBottom: "8px" }}>
-                <Text as="p"><strong>Cron:</strong> {schedule.cron} - {schedule.enabled ? "Enabled" : "Disabled"}</Text>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Text as="p" color="subdued" tone="subdued">No schedules configured. Feed will only regenerate manually or via webhooks.</Text>
-        )}
-      </div>
-    </div>
-  );
-}
-
 

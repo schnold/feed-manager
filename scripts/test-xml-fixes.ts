@@ -107,7 +107,7 @@ console.log('============================');
 
 const mockTranslatedProduct = {
   id: "gid://shopify/Product/15482914177373",
-  title: "Travertinová vestavná svítidla – 12" LED stropní svítidlo (přírodní kámen)",
+  title: "Travertinová vestavná svítidla – 12\" LED stropní svítidlo (přírodní kámen)",
   description: "Osvětlete svůj prostor nadčasovou elegancí tohoto ručně vyrobeného travertinového vestavného svítidla - ideální pro moderní interiéry a nízké stropy.",
   handle: "travertine-flush-mount-light-12in",
   variants: [

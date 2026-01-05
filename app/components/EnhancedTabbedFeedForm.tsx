@@ -12,7 +12,6 @@ import {
   Checkbox,
   Text,
   Divider,
-  ButtonGroup,
   InlineStack,
   BlockStack,
   Tabs,
@@ -55,8 +54,6 @@ interface EnhancedTabbedFeedFormProps {
   onSubmit?: (data: FeedFormData) => void;
   locations?: Array<{id: string; name: string}>;
 }
-
-type TabType = 'info' | 'settings' | 'mapping' | 'filters';
 
 export function EnhancedTabbedFeedForm({
   locales,
@@ -136,10 +133,6 @@ export function EnhancedTabbedFeedForm({
     setFormData(prev => ({ ...prev, name: value }));
   }, []);
 
-  const handleTitleChange = useCallback((value: string) => {
-    setFormData(prev => ({ ...prev, title: value }));
-  }, []);
-
   const handleChannelChange = useCallback((value: string) => {
     setFormData(prev => ({ ...prev, channel: value }));
   }, []);
@@ -180,19 +173,6 @@ export function EnhancedTabbedFeedForm({
       settings: {
         ...prev.settings,
         includeDraftProducts: checked
-      }
-    }));
-  }, []);
-
-  const handleFieldMappingChange = useCallback((field: string, mapping: string) => {
-    setFormData(prev => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        fieldMappings: {
-          ...prev.settings?.fieldMappings,
-          [field]: mapping
-        }
       }
     }));
   }, []);

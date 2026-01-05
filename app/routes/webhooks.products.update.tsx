@@ -16,7 +16,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     // authenticate.webhook automatically verifies HMAC signature
     // If HMAC is invalid, it will throw an error or return a 401 Response
-    const { shop, session, topic, payload } = await authenticate.webhook(request);
+    const { shop, topic, payload } = await authenticate.webhook(request);
 
     console.log(`Received ${topic} webhook for ${shop}`);
 

@@ -9,15 +9,6 @@ export interface SubscriptionInfo {
   trialEndsAt: Date | null;
 }
 
-const PLAN_NAME_TO_ID: Record<string, string> = {
-  'BASE': 'base',
-  'MID': 'mid',
-  'BASIC': 'basic',
-  'GROW': 'grow',
-  'PRO': 'pro',
-  'PREMIUM': 'premium'
-};
-
 /**
  * SECURITY: Get the current active subscription for the shop from database
  * This is faster and more reliable than querying Shopify API each time

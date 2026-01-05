@@ -9,43 +9,6 @@ console.log('🧪 Testing Shopify API Usage for Feed Generation\n');
 console.log('Test 1: Admin API Contextual Pricing');
 console.log('=====================================');
 
-const adminApiQuery = `
-query Products($pageSize: Int!, $cursor: String, $country: CountryCode) {
-  products(first: $pageSize, after: $cursor) {
-    pageInfo { hasNextPage }
-    edges {
-      cursor
-      node {
-        id
-        title
-        bodyHtml
-        handle
-        variants(first: 100) {
-          edges {
-            node {
-              id
-              title
-              price
-              compareAtPrice
-              contextualPricing(context: {country: $country}) {
-                price {
-                  amount
-                  currencyCode
-                }
-                compareAtPrice {
-                  amount
-                  currencyCode
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-`;
-
 console.log('✅ Admin API Query for contextual pricing:');
 console.log('   - Uses contextualPricing with country context');
 console.log('   - Gets localized prices in target currency');
@@ -55,38 +18,6 @@ console.log();
 // Test 2: Validate Storefront API approach for translations
 console.log('Test 2: Storefront API Translations');
 console.log('====================================');
-
-const storefrontApiQuery = `
-query TranslatedProducts @inContext(language: CS, country: CZ) {
-  products(first: 10) {
-    edges {
-      node {
-        id
-        title
-        description
-        descriptionHtml
-        handle
-        variants(first: 100) {
-          edges {
-            node {
-              id
-              title
-              price {
-                amount
-                currencyCode
-              }
-              compareAtPrice {
-                amount
-                currencyCode
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-`;
 
 console.log('✅ Storefront API Query for translations:');
 console.log('   - Uses @inContext directive with language and country');

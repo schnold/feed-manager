@@ -10,7 +10,8 @@ import { EnhancedTabbedFeedForm } from "../components/EnhancedTabbedFeedForm";
 import { Page, Layout, Banner } from "@shopify/polaris";
 import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
 import { randomUUID } from "crypto";
-import { requireActivePlan, canCreateFeed, getCurrentSubscription, getMaxFeedsForPlan } from "../services/shopify/subscription.server";
+import { requireActivePlan, canCreateFeed } from "../services/shopify/subscription.server";
+import { createOrUpdateFeedSchedule } from "../services/scheduling/feed-scheduler.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   // SECURITY: Require active subscription (minimum BASE plan)
@@ -148,6 +149,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         settings
       });
 
+      // Update or create the daily schedule for this feed
+      // This ensures the feed is regenerated once per day at 2 AM in its timezone
+      await createOrUpdateFeedSchedule(feedId, {
+        hourOfDay: 2,
+        enabled: true
+      });
+
       return redirect("/app/feeds");
     }
 
@@ -201,6 +209,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       publicPath,
       publicUrl,
       status: "pending"
+    });
+
+    // Set up daily scheduled regeneration for this feed
+    // This ensures the feed is regenerated once per day at 2 AM in its timezone
+    await createOrUpdateFeedSchedule(feed.id, {
+      hourOfDay: 2,
+      enabled: true
     });
 
     // Automatically trigger feed generation after creation

@@ -12,7 +12,6 @@ import {
   BlockStack,
   Box,
   Divider,
-  ButtonGroup,
   Tooltip
 } from "@shopify/polaris";
 import { useState, useCallback } from "react";
@@ -53,26 +52,6 @@ export function CustomFieldEditor({
     fieldType: 'shopify' as 'shopify' | 'metafield',
     ruleSet: null
   });
-
-  const defaultShopifyFields = [
-    { label: 'Variant ID', value: 'variantId' },
-    { label: 'Product ID', value: 'productId' },
-    { label: 'Title', value: 'title' },
-    { label: 'Description', value: 'description' },
-    { label: 'Price', value: 'price' },
-    { label: 'Compare at price', value: 'compareAtPrice' },
-    { label: 'SKU', value: 'sku' },
-    { label: 'Barcode', value: 'barcode' },
-    { label: 'Vendor', value: 'vendor' },
-    { label: 'Product type', value: 'productType' },
-    { label: 'Category', value: 'category' },
-    { label: 'Tags', value: 'tags' },
-    { label: 'Weight', value: 'weight' },
-    { label: 'Featured image', value: 'featuredImage' },
-    { label: 'Availability', value: 'availability' },
-    { label: 'Inventory quantity', value: 'inventoryQuantity' },
-    ...shopifyFields
-  ];
 
   const defaultRules = [
     { label: 'Price calculation rule', value: 'priceCalculation' },

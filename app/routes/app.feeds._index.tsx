@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
-import { Link, useLoaderData, useFetcher, useNavigate, Form, useRevalidator } from "@remix-run/react";
+import { json } from "@remix-run/node";
+import { Link, useLoaderData, useFetcher, useRevalidator } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { authenticate } from "../shopify.server";
 import { ShopRepository } from "../db/repositories/shop.server";
@@ -8,7 +8,8 @@ import { FeedRepository } from "../db/repositories/feed.server";
 import { deleteXmlFromS3 } from "../services/storage/s3.server";
 import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
 import { getCurrencyDisplay } from "../utils/currency";
-import { requireActivePlan, getCurrentSubscription, getMaxFeedsForPlan } from "../services/shopify/subscription.server";
+import { requireActivePlan, getMaxFeedsForPlan } from "../services/shopify/subscription.server";
+import { getNextScheduledRun } from "../services/scheduling/feed-scheduler.server";
 import {
   Page,
   Layout,
@@ -21,16 +22,12 @@ import {
   InlineStack,
   EmptyState,
   Spinner,
-  Icon,
-  Link as PolarisLink
+  Banner
 } from "@shopify/polaris";
 import {
   ClipboardIcon,
   EditIcon,
   DeleteIcon,
-  StatusActiveIcon,
-  ClockIcon,
-  AlertCircleIcon,
   RefreshIcon,
   CheckIcon
 } from "@shopify/polaris-icons";
@@ -57,8 +54,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const maxFeeds = getMaxFeedsForPlan(subscription.plan);
   const canCreateMoreFeeds = feeds.length < maxFeeds;
 
+  // Add next scheduled run time for each feed
+  const feedsWithSchedule = feeds.map((feed: any) => {
+    const nextScheduledRun = getNextScheduledRun(feed.timezone, 2);
+    return {
+      ...feed,
+      nextScheduledRun: nextScheduledRun.toISOString()
+    };
+  });
+
   return json({
-    feeds,
+    feeds: feedsWithSchedule,
     shop,
     maxFeeds,
     canCreateMoreFeeds,
@@ -218,36 +224,41 @@ export default function FeedsIndex() {
     regenerateFetcher.submit(formData, { method: "post" });
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string, timezone?: string) => {
     const date = new Date(dateString);
-    // Use UTC methods to avoid timezone differences between server and client
+
+    if (timezone) {
+      // Format in the feed's timezone
+      try {
+        const dateInTZ = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+        const year = dateInTZ.getFullYear();
+        const month = String(dateInTZ.getMonth() + 1).padStart(2, '0');
+        const day = String(dateInTZ.getDate()).padStart(2, '0');
+        const hours = String(dateInTZ.getHours()).padStart(2, '0');
+        const minutes = String(dateInTZ.getMinutes()).padStart(2, '0');
+
+        return {
+          date: `${year}-${month}-${day}`,
+          time: `${hours}:${minutes}`,
+          timezone: timezone.split('/').pop() || timezone
+        };
+      } catch (e) {
+        // Fallback to UTC if timezone is invalid
+      }
+    }
+
+    // Use UTC methods as fallback
     const year = date.getUTCFullYear();
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     const day = String(date.getUTCDate()).padStart(2, '0');
     const hours = String(date.getUTCHours()).padStart(2, '0');
     const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-    
+
     return {
       date: `${year}-${month}-${day}`,
-      time: `${hours}:${minutes}:${seconds}`
+      time: `${hours}:${minutes}`,
+      timezone: 'UTC'
     };
-  };
-
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "success":
-        return { type: "check-circle", tone: "success" };
-      case "running":
-      case "pending":
-        return { type: "clock", tone: "info" };
-      case "error":
-        return { type: "alert-circle", tone: "critical" };
-      case "idle":
-      default:
-        return { type: "clock", tone: "subdued" };
-    }
   };
 
   const getStatusText = (status: string) => {
@@ -291,7 +302,9 @@ export default function FeedsIndex() {
   };
 
   const tableRows = feeds.map((feed: any, index: number) => {
-    const lastUpdated = feed.updatedAt ? formatDate(feed.updatedAt) : null;
+    // Show last successful run time instead of general updatedAt
+    const lastSuccessful = feed.lastSuccessAt ? formatDate(feed.lastSuccessAt, feed.timezone) : null;
+    const nextScheduled = feed.nextScheduledRun ? formatDate(feed.nextScheduledRun, feed.timezone) : null;
     const statusText = getStatusText(feed.status);
     const isGenerating = feed.status === "running" || feed.status === "pending";
     const isCopied = copiedFeedId === feed.id;
@@ -326,14 +339,23 @@ export default function FeedsIndex() {
       >
         {isCopied ? "Copied" : "Copy Link"}
       </Button>,
-      // Last Updated column
-      lastUpdated ? (
+      // Last Successful Update column
+      lastSuccessful ? (
         <BlockStack gap="100" key={`updated-${feed.id}`}>
-          <Text as="span" variant="bodySm">{lastUpdated.date}</Text>
-          <Text as="span" variant="bodySm" tone="subdued">at {lastUpdated.time}</Text>
+          <Text as="span" variant="bodySm" fontWeight="semibold">Last: {lastSuccessful.date}</Text>
+          <Text as="span" variant="bodySm" tone="subdued">{lastSuccessful.time} {lastSuccessful.timezone}</Text>
         </BlockStack>
       ) : (
-        <Text as="span" tone="subdued" key={`updated-${feed.id}`}>-</Text>
+        <Text as="span" tone="subdued" key={`updated-${feed.id}`}>Never</Text>
+      ),
+      // Next Scheduled Update column
+      nextScheduled ? (
+        <BlockStack gap="100" key={`scheduled-${feed.id}`}>
+          <Text as="span" variant="bodySm" fontWeight="semibold">Next: {nextScheduled.date}</Text>
+          <Text as="span" variant="bodySm" tone="subdued">{nextScheduled.time} {nextScheduled.timezone}</Text>
+        </BlockStack>
+      ) : (
+        <Text as="span" tone="subdued" key={`scheduled-${feed.id}`}>-</Text>
       ),
       // Actions column
       <InlineStack gap="200" key={`actions-${feed.id}`}>
@@ -417,13 +439,15 @@ export default function FeedsIndex() {
                     'text',
                     'text',
                     'text',
+                    'text',
                     'text'
                   ]}
                   headings={[
                     'Feed Name',
                     'Status',
                     'Feed Link',
-                    'Last Updated',
+                    'Last Update',
+                    'Next Scheduled',
                     'Actions'
                   ]}
                   rows={tableRows}

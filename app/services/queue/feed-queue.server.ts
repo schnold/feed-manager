@@ -1,4 +1,4 @@
-import { Queue, Worker, Job } from "bullmq";
+import { Queue, Worker, type Job } from "bullmq";
 import Redis from "ioredis";
 import { generateGoogleXML } from "../feeds/generate-google-xml.server";
 import { FeedRepository } from "../../db/repositories/feed.server";
@@ -246,7 +246,7 @@ if (redisWorker && feedGenerationQueue && !isServerless) {
     feedGenerationWorker = new Worker<FeedGenerationJob>(
       "feed-generation",
       async (job: Job<FeedGenerationJob>) => {
-        const { feedId, shopId, shopDomain, accessToken, triggeredBy } = job.data;
+        const { feedId, shopDomain, accessToken, triggeredBy } = job.data;
 
         console.log(`[Worker] Processing feed generation for feed ${feedId} (triggered by: ${triggeredBy})`);
 

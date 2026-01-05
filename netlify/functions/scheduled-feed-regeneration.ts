@@ -1,27 +1,32 @@
 import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
 
 /**
- * Netlify Scheduled Function to regenerate all feeds automatically
- * 
+ * Netlify Scheduled Function to regenerate feeds based on their timezone schedules
+ *
+ * This function runs hourly to check which feeds need regeneration based on their
+ * individual timezone settings. Each feed is regenerated once per day at 2 AM
+ * in its configured timezone.
+ *
  * Setup Instructions:
  * 1. Add FEED_REGENERATION_SECRET to your Netlify environment variables
  * 2. Configure the schedule in netlify.toml:
  *    [functions."scheduled-feed-regeneration"]
- *    schedule = "0 2 * * *"  # Run daily at 2 AM UTC
- * 
- * Alternative schedules:
- * - "0 0,6,12,18 * * *"  # Every 6 hours
- * - "0 0 * * 0"          # Weekly on Sunday at midnight
- * - "0 0,2,4,6,8,10,12,14,16,18,20,22 * * *"  # Every 2 hours
- * 
+ *    schedule = "0 * * * *"  # Run every hour to check for feeds due in their timezones
+ *
+ * How it works:
+ * - Each feed has a timezone setting (e.g., "America/New_York", "Europe/London")
+ * - Feeds are regenerated once per day at 2 AM in their local timezone
+ * - The function checks every hour which feeds are due for regeneration
+ * - Feeds are only regenerated if they haven't been regenerated today in their timezone
+ *
  * To manually trigger: Deploy this function and use Netlify's Functions UI
  */
 
 const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
-  console.log("Scheduled feed regeneration triggered");
+  console.log("Timezone-aware feed regeneration check triggered");
 
   const secret = process.env.FEED_REGENERATION_SECRET;
-  
+
   if (!secret) {
     console.error("FEED_REGENERATION_SECRET not configured");
     return {
@@ -32,11 +37,11 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
 
   // Get the site URL from Netlify environment
   const siteUrl = process.env.URL || process.env.DEPLOY_PRIME_URL || "http://localhost:3000";
-  const apiUrl = `${siteUrl}/api/feeds/regenerate-all`;
+  const apiUrl = `${siteUrl}/api/feeds/regenerate-scheduled`;
 
   try {
-    console.log(`Calling regeneration API: ${apiUrl}`);
-    
+    console.log(`Calling timezone-aware regeneration API: ${apiUrl}`);
+
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
@@ -44,8 +49,8 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         "X-Regeneration-Secret": secret
       },
       body: JSON.stringify({
-        // Optional: specify a shop domain to regenerate only that shop's feeds
-        // shopDomain: "your-shop.myshopify.com"
+        hourOfDay: 2, // Regenerate at 2 AM in each feed's timezone
+        toleranceMinutes: 60 // Allow execution within 60 minutes of scheduled time
       })
     });
 
@@ -59,19 +64,19 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       };
     }
 
-    console.log("Regeneration successful:", data);
-    
+    console.log("Timezone-aware regeneration check completed:", data);
+
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
-        message: "Scheduled regeneration completed",
+        message: "Timezone-aware regeneration check completed",
         result: data
       })
     };
   } catch (error) {
     console.error("Error calling regeneration API:", error);
-    
+
     return {
       statusCode: 500,
       body: JSON.stringify({

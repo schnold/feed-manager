@@ -45,13 +45,10 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# Scheduled function to regenerate all feeds automatically
-# Runs daily at 2 AM UTC (adjust schedule as needed)
+# Scheduled function for timezone-aware feed regeneration
+# Runs hourly to check which feeds need regeneration based on their timezone settings
+# Each feed is regenerated once per day at 2 AM in its configured timezone
 # Cron format: minute hour day-of-month month day-of-week
-# Examples:
-#   "0 2 * * *"     - Daily at 2 AM UTC
-#   "0 */6 * * *"   - Every 6 hours
-#   "0 0 * * 0"     - Weekly on Sunday at midnight
-#   "0 */2 * * *"   - Every 2 hours
+# "0 * * * *" = Every hour at the top of the hour
 [functions."scheduled-feed-regeneration"]
-  schedule = "0 2 * * *"
+  schedule = "0 * * * *"

@@ -79,64 +79,112 @@ try {
     // Billing configuration - defines all available plans
     billing: {
       [PLAN_BASE_MONTHLY]: {
-        amount: 5.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Every30Days,
+        lineItems: [
+          {
+            amount: 5.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Every30Days,
+          },
+        ],
       },
       [PLAN_BASE_YEARLY]: {
-        amount: 45.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Annual,
+        lineItems: [
+          {
+            amount: 45.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Annual,
+          },
+        ],
       },
       [PLAN_MID_MONTHLY]: {
-        amount: 14.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Every30Days,
+        lineItems: [
+          {
+            amount: 14.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Every30Days,
+          },
+        ],
       },
       [PLAN_MID_YEARLY]: {
-        amount: 126.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Annual,
+        lineItems: [
+          {
+            amount: 126.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Annual,
+          },
+        ],
       },
       [PLAN_BASIC_MONTHLY]: {
-        amount: 21.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Every30Days,
+        lineItems: [
+          {
+            amount: 21.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Every30Days,
+          },
+        ],
       },
       [PLAN_BASIC_YEARLY]: {
-        amount: 189.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Annual,
+        lineItems: [
+          {
+            amount: 189.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Annual,
+          },
+        ],
       },
       [PLAN_GROW_MONTHLY]: {
-        amount: 27.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Every30Days,
+        lineItems: [
+          {
+            amount: 27.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Every30Days,
+          },
+        ],
       },
       [PLAN_GROW_YEARLY]: {
-        amount: 243.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Annual,
+        lineItems: [
+          {
+            amount: 243.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Annual,
+          },
+        ],
       },
       [PLAN_PRO_MONTHLY]: {
-        amount: 59.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Every30Days,
+        lineItems: [
+          {
+            amount: 59.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Every30Days,
+          },
+        ],
       },
       [PLAN_PRO_YEARLY]: {
-        amount: 531.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Annual,
+        lineItems: [
+          {
+            amount: 531.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Annual,
+          },
+        ],
       },
       [PLAN_PREMIUM_MONTHLY]: {
-        amount: 134.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Every30Days,
+        lineItems: [
+          {
+            amount: 134.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Every30Days,
+          },
+        ],
       },
       [PLAN_PREMIUM_YEARLY]: {
-        amount: 1206.0,
-        currencyCode: "EUR",
-        interval: BillingInterval.Annual,
+        lineItems: [
+          {
+            amount: 1206.0,
+            currencyCode: "EUR",
+            interval: BillingInterval.Annual,
+          },
+        ],
       },
     },
     ...(process.env.SHOP_CUSTOM_DOMAIN

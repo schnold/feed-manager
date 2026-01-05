@@ -1,5 +1,4 @@
 import {
-  Autocomplete,
   ResourceList,
   ResourceItem,
   OptionList,
@@ -54,24 +53,12 @@ export function MetafieldSelector({
   metafieldDefinitions = [],
   isLoading = false
 }: MetafieldSelectorProps) {
-  // If used as a simple TextField-like component
-  if (label && onChange && !onFieldSelect) {
-    return (
-      <TextField
-        label={label}
-        value={value || ''}
-        onChange={onChange}
-        helpText={helpText}
-        autoComplete="off"
-      />
-    );
-  }
-
+  // All hooks must be called before any conditional returns
   const [query, setQuery] = useState('');
   const [selectedView, setSelectedView] = useState<'shopify' | 'metafields' | 'browse'>('shopify');
 
-  // Default Shopify fields organized by category
-  const shopifyFields: ShopifyField[] = [
+  // Default Shopify fields organized by category - wrapped in useMemo to prevent recreation on every render
+  const shopifyFields: ShopifyField[] = useMemo(() => [
     // Product fields
     { id: 'product.id', name: 'Product ID', category: 'Product', type: 'string', description: 'Unique product identifier' },
     { id: 'product.title', name: 'Product Title', category: 'Product', type: 'string', description: 'Product name' },
@@ -105,7 +92,7 @@ export function MetafieldSelector({
     // SEO fields
     { id: 'seo.title', name: 'SEO Title', category: 'SEO', type: 'string', description: 'Page title for SEO' },
     { id: 'seo.description', name: 'SEO Description', category: 'SEO', type: 'string', description: 'Meta description' },
-  ];
+  ], []);
 
   // Filter options based on query
   const filteredShopifyFields = useMemo(() => {
@@ -115,7 +102,7 @@ export function MetafieldSelector({
       field.category.toLowerCase().includes(query.toLowerCase()) ||
       field.description?.toLowerCase().includes(query.toLowerCase())
     );
-  }, [query]);
+  }, [query, shopifyFields]);
 
   const filteredMetafields = useMemo(() => {
     if (!query) return metafieldDefinitions;
@@ -200,6 +187,19 @@ export function MetafieldSelector({
     };
     return <Badge {...(badgeProps[type] || { children: type })} />;
   };
+
+  // If used as a simple TextField-like component - conditional return after all hooks
+  if (label && onChange && !onFieldSelect) {
+    return (
+      <TextField
+        label={label}
+        value={value || ''}
+        onChange={onChange}
+        helpText={helpText}
+        autoComplete="off"
+      />
+    );
+  }
 
   return (
     <BlockStack gap="400">

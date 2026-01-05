@@ -14,7 +14,7 @@ import {
   Grid,
   Banner
 } from "@shopify/polaris";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useActionData, useLoaderData } from "@remix-run/react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -94,7 +94,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function ChoosePlan() {
   const actionData = useActionData<typeof action>();
-  const loaderData = useLoaderData<typeof loader>();
+  useLoaderData<typeof loader>();
   const [showYearly, setShowYearly] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>("grow");
 
@@ -114,7 +114,7 @@ export default function ChoosePlan() {
       name: 'BASE',
       price: showYearly ? 45 : 5.00,
       interval: showYearly ? 'yearly' : 'monthly',
-      planKey: showYearly ? plans.PLAN_BASE_YEARLY : plans.PLAN_BASE_MONTHLY,
+      planKey: showYearly ? 'BASE_YEARLY' : 'BASE_MONTHLY',
       features: ['2 feeds included', '1 scheduled update per feed per day', 'Unlimited manual updates', 'Multi language', 'Multi currency', 'Feed rules & filters', 'Unlimited products', 'Unlimited orders'],
       popular: false
     },
@@ -123,7 +123,7 @@ export default function ChoosePlan() {
       name: 'MID',
       price: showYearly ? 126 : 14.00,
       interval: showYearly ? 'yearly' : 'monthly',
-      planKey: showYearly ? plans.PLAN_MID_YEARLY : plans.PLAN_MID_MONTHLY,
+      planKey: showYearly ? 'MID_YEARLY' : 'MID_MONTHLY',
       features: ['4 feeds included', '1 scheduled update per feed per day', 'Unlimited manual updates', 'Multi language', 'Multi currency', 'Feed rules & filters', 'Unlimited products', 'Unlimited orders'],
       popular: false
     },
@@ -132,7 +132,7 @@ export default function ChoosePlan() {
       name: 'BASIC',
       price: showYearly ? 189 : 21.00,
       interval: showYearly ? 'yearly' : 'monthly',
-      planKey: showYearly ? plans.PLAN_BASIC_YEARLY : plans.PLAN_BASIC_MONTHLY,
+      planKey: showYearly ? 'BASIC_YEARLY' : 'BASIC_MONTHLY',
       features: ['Up to 6 feeds included', '1 scheduled update per feed per day', 'Unlimited manual updates', 'Multi language', 'Multi currency', 'Feed rules & filters', 'Unlimited products', 'Unlimited orders'],
       popular: false
     },
@@ -141,7 +141,7 @@ export default function ChoosePlan() {
       name: 'GROW',
       price: showYearly ? 243 : 27.00,
       interval: showYearly ? 'yearly' : 'monthly',
-      planKey: showYearly ? plans.PLAN_GROW_YEARLY : plans.PLAN_GROW_MONTHLY,
+      planKey: showYearly ? 'GROW_YEARLY' : 'GROW_MONTHLY',
       features: ['8 feeds included', '1 scheduled update per feed per day', 'Unlimited manual updates', 'Multi language', 'Multi currency', 'Feed rules & filters', 'Unlimited products', 'Unlimited orders'],
       popular: true
     },
@@ -150,7 +150,7 @@ export default function ChoosePlan() {
       name: 'PRO',
       price: showYearly ? 531 : 59.00,
       interval: showYearly ? 'yearly' : 'monthly',
-      planKey: showYearly ? plans.PLAN_PRO_YEARLY : plans.PLAN_PRO_MONTHLY,
+      planKey: showYearly ? 'PRO_YEARLY' : 'PRO_MONTHLY',
       features: ['Up to 20 feeds included', '4 scheduled updates per feed per day', 'Unlimited manual updates', 'Multi language', 'Multi currency', 'Feed rules & filters', 'Unlimited products', 'Unlimited orders'],
       popular: false
     },
@@ -159,7 +159,7 @@ export default function ChoosePlan() {
       name: 'PREMIUM',
       price: showYearly ? 1206 : 134.00,
       interval: showYearly ? 'yearly' : 'monthly',
-      planKey: showYearly ? plans.PLAN_PREMIUM_YEARLY : plans.PLAN_PREMIUM_MONTHLY,
+      planKey: showYearly ? 'PREMIUM_YEARLY' : 'PREMIUM_MONTHLY',
       features: ['Unlimited feeds included', '8 scheduled updates per feed per day', 'Unlimited manual updates', 'Multi language', 'Multi currency', 'Feed rules & filters', 'Unlimited products', 'Unlimited orders'],
       popular: false
     }
