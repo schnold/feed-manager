@@ -24,7 +24,7 @@ export class ShopRepository {
       data: {
         myshopifyDomain: data.myshopifyDomain,
         accessToken: data.accessToken,
-        plan: data.plan || "basic",
+        plan: data.plan || "free",  // Default to free for new shops
         features: data.features || {}
       }
     });
@@ -41,25 +41,41 @@ export class ShopRepository {
       create: {
         myshopifyDomain: data.myshopifyDomain,
         accessToken: data.accessToken,
-        plan: data.plan || "basic",
+        plan: data.plan || "free",  // Default to free for new shops
         features: data.features || {}
       },
       update: {
         accessToken: data.accessToken,
-        plan: data.plan || "basic",
-        features: data.features || {}
+        // CRITICAL: Only update plan and features if explicitly provided
+        // This prevents overwriting subscription-based plans
+        ...(data.plan !== undefined && { plan: data.plan }),
+        ...(data.features !== undefined && { features: data.features })
       }
     });
   }
 
   static async updatePlan(myshopifyDomain: string, plan: string, features?: any): Promise<Shop> {
-    return db.shop.update({
+    const updateData: any = { plan };
+
+    // Only update features if provided
+    if (features !== undefined) {
+      updateData.features = features;
+    }
+
+    console.log(`[ShopRepository] Updating plan for ${myshopifyDomain}:`, { plan, features });
+
+    const updatedShop = await db.shop.update({
       where: { myshopifyDomain },
-      data: {
-        plan,
-        features: features || undefined
-      }
+      data: updateData
     });
+
+    console.log(`[ShopRepository] Plan updated successfully:`, {
+      domain: updatedShop.myshopifyDomain,
+      plan: updatedShop.plan,
+      features: updatedShop.features
+    });
+
+    return updatedShop;
   }
 
   static async delete(myshopifyDomain: string): Promise<void> {

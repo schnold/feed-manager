@@ -213,6 +213,16 @@ export async function canCreateFeed(request: Request): Promise<{ allowed: boolea
   const maxAllowed = features?.maxFeeds ?? getMaxFeedsForPlan(plan);
   const currentCount = shop.feeds.length;
 
+  console.log(`[canCreateFeed] Shop ${session.shop}:`, {
+    plan,
+    shopPlan: shop.plan,
+    subscriptionPlan: shop.subscriptions[0]?.planId,
+    features,
+    maxAllowed,
+    currentCount,
+    allowed: currentCount < maxAllowed
+  });
+
   return {
     allowed: currentCount < maxAllowed,
     currentCount,
