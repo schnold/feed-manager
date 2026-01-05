@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { PLAN_FEATURES } from "../services/shopify/subscription.server";
 
 /**
  * SECURITY: This route handles the return from Shopify's billing confirmation page
@@ -59,19 +60,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       },
     });
 
-    const data = await response.json();
+    const data = await response.json() as any;
 
-    if (data.errors) {
-      console.error("[billing-callback] GraphQL errors:", data.errors);
+    if (data.errors || !data.data?.node) {
+      console.error("[billing-callback] GraphQL errors or subscription not found:", data.errors || "No node data");
       return redirect("/app/choose-plan?error=graphql_error");
     }
 
-    const subscription = data.data?.node;
-
-    if (!subscription) {
-      console.error("[billing-callback] Subscription not found for charge_id:", chargeId);
-      return redirect("/app/choose-plan?error=subscription_not_found");
-    }
+    const subscription = data.data.node;
 
     console.log(`[billing-callback] Subscription details:`, {
       id: subscription.id,
@@ -118,7 +114,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       'PREMIUM': 'premium'
     };
 
-    const planId = planIdMap[planName] || 'basic';
+    let planId = planIdMap[planName] || 'basic';
+
+    // Check if it's yearly based on name or metadata (if we had it)
+    if (subscription.name.toUpperCase().includes('YEARLY') || interval === 'ANNUAL') {
+      planId = `${planId}_yearly`;
+    }
 
     console.log(`[billing-callback] Extracted plan info: ${planId}, interval: ${interval}, price: ${price} ${currencyCode}`);
 
@@ -127,21 +128,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       where: { myshopifyDomain: session.shop },
     });
 
+    // SECURITY STEP 5: Calculate trial end date
+    const trialEndsAt = subscription.trialDays
+      ? new Date(Date.now() + subscription.trialDays * 24 * 60 * 60 * 1000)
+      : null;
+
     if (!shop) {
       console.log(`[billing-callback] Creating new shop record for ${session.shop}`);
       shop = await db.shop.create({
         data: {
           myshopifyDomain: session.shop,
-          accessToken: session.accessToken,
+          accessToken: session.accessToken || "",
           plan: planId,
+          features: PLAN_FEATURES[planId.replace('_yearly', '')] || PLAN_FEATURES['basic']
         },
       });
     }
-
-    // SECURITY STEP 5: Calculate trial end date
-    const trialEndsAt = subscription.trialDays
-      ? new Date(Date.now() + subscription.trialDays * 24 * 60 * 60 * 1000)
-      : null;
 
     // SECURITY STEP 6: Save/update subscription in database
     const existingSubscription = await db.subscription.findUnique({
@@ -187,7 +189,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // SECURITY STEP 7: Update shop's plan
     await db.shop.update({
       where: { id: shop.id },
-      data: { plan: planId },
+      data: {
+        plan: planId,
+        features: PLAN_FEATURES[planId.replace('_yearly', '')] || PLAN_FEATURES['basic']
+      } as any,
     });
 
     console.log(`[billing-callback] Successfully processed subscription for ${session.shop}. Plan: ${planId}`);

@@ -7,7 +7,46 @@ export interface SubscriptionInfo {
   name: string;
   isTest: boolean;
   trialEndsAt: Date | null;
+  features: any;
 }
+
+export const PLAN_FEATURES: Record<string, any> = {
+  'free': {
+    maxFeeds: 1,
+    maxScheduledUpdates: 0,
+    features: ['1 feed included', 'Manual updates only']
+  },
+  'base': {
+    maxFeeds: 2,
+    maxScheduledUpdates: 1,
+    features: ['2 feeds included', '1 scheduled update per day']
+  },
+  'mid': {
+    maxFeeds: 4,
+    maxScheduledUpdates: 1,
+    features: ['4 feeds included', '1 scheduled update per day']
+  },
+  'basic': {
+    maxFeeds: 6,
+    maxScheduledUpdates: 1,
+    features: ['6 feeds included', '1 scheduled update per day']
+  },
+  'grow': {
+    maxFeeds: 8,
+    maxScheduledUpdates: 1,
+    features: ['8 feeds included', '1 scheduled update per day']
+  },
+  'pro': {
+    maxFeeds: 20,
+    maxScheduledUpdates: 4,
+    features: ['20 feeds included', '4 scheduled updates per day']
+  },
+  'premium': {
+    maxFeeds: Infinity,
+    maxScheduledUpdates: 8,
+    features: ['Unlimited feeds included', '8 scheduled updates per day']
+  }
+};
 
 /**
  * SECURITY: Get the current active subscription for the shop from database
@@ -46,6 +85,7 @@ export async function getCurrentSubscription(request: Request): Promise<Subscrip
       name: subscription.name,
       isTest: subscription.isTest,
       trialEndsAt: subscription.trialEndsAt,
+      features: shop.features || PLAN_FEATURES[subscription.planId] || PLAN_FEATURES['free']
     };
   } catch (error) {
     console.error("[subscription] Error fetching subscription:", error);
@@ -104,6 +144,7 @@ export async function requireActivePlan(
       name: 'Free Plan',
       isTest: false,
       trialEndsAt: null,
+      features: PLAN_FEATURES['free']
     };
   }
 
@@ -141,6 +182,7 @@ export async function requireActivePlan(
     name: subscription.name,
     isTest: subscription.isTest,
     trialEndsAt: subscription.trialEndsAt,
+    features: shop.features || PLAN_FEATURES[subscription.planId] || PLAN_FEATURES['free']
   };
 }
 
@@ -166,8 +208,9 @@ export async function canCreateFeed(request: Request): Promise<{ allowed: boolea
     throw new Response("Shop not found", { status: 404 });
   }
 
-  const plan = shop.subscriptions[0]?.planId || shop.plan || 'basic';
-  const maxAllowed = getMaxFeedsForPlan(plan);
+  const plan = shop.subscriptions[0]?.planId || shop.plan || 'free';
+  const features = shop.features as any;
+  const maxAllowed = features?.maxFeeds ?? getMaxFeedsForPlan(plan);
   const currentCount = shop.feeds.length;
 
   return {
@@ -182,34 +225,14 @@ export async function canCreateFeed(request: Request): Promise<{ allowed: boolea
  * Get the maximum number of feeds allowed for a plan
  */
 export function getMaxFeedsForPlan(plan: string): number {
-  const limits: Record<string, number> = {
-    'free': 1,
-    'base': 2,
-    'mid': 4,
-    'basic': 6,
-    'grow': 8,
-    'pro': 20,
-    'premium': Infinity // Unlimited
-  };
-
-  return limits[plan] || limits['free'];
+  return PLAN_FEATURES[plan]?.maxFeeds || PLAN_FEATURES['free'].maxFeeds;
 }
 
 /**
  * Get the maximum number of scheduled updates per day for a plan
  */
 export function getMaxScheduledUpdatesForPlan(plan: string): number {
-  const limits: Record<string, number> = {
-    'free': 0,
-    'base': 1,
-    'mid': 1,
-    'basic': 1,
-    'grow': 1,
-    'pro': 4,
-    'premium': 8
-  };
-
-  return limits[plan] || 0;
+  return PLAN_FEATURES[plan]?.maxScheduledUpdates || PLAN_FEATURES['free'].maxScheduledUpdates;
 }
 
 /**
@@ -239,7 +262,7 @@ export async function verifySubscriptionFromShopify(
       variables: { id: subscriptionId },
     });
 
-    const data = await response.json();
+    const data = await response.json() as any;
 
     if (data.errors || !data.data?.node) {
       return { valid: false, status: 'UNKNOWN', isTest: false };

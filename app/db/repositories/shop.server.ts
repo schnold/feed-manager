@@ -18,12 +18,14 @@ export class ShopRepository {
     myshopifyDomain: string;
     accessToken: string;
     plan?: string;
+    features?: any;
   }): Promise<Shop> {
     return db.shop.create({
       data: {
         myshopifyDomain: data.myshopifyDomain,
         accessToken: data.accessToken,
-        plan: data.plan || "basic"
+        plan: data.plan || "basic",
+        features: data.features || {}
       }
     });
   }
@@ -32,25 +34,31 @@ export class ShopRepository {
     myshopifyDomain: string;
     accessToken: string;
     plan?: string;
+    features?: any;
   }): Promise<Shop> {
     return db.shop.upsert({
       where: { myshopifyDomain: data.myshopifyDomain },
       create: {
         myshopifyDomain: data.myshopifyDomain,
         accessToken: data.accessToken,
-        plan: data.plan || "basic"
+        plan: data.plan || "basic",
+        features: data.features || {}
       },
       update: {
         accessToken: data.accessToken,
-        plan: data.plan || "basic"
+        plan: data.plan || "basic",
+        features: data.features || {}
       }
     });
   }
 
-  static async updatePlan(myshopifyDomain: string, plan: string): Promise<Shop> {
+  static async updatePlan(myshopifyDomain: string, plan: string, features?: any): Promise<Shop> {
     return db.shop.update({
       where: { myshopifyDomain },
-      data: { plan }
+      data: {
+        plan,
+        features: features || undefined
+      }
     });
   }
 

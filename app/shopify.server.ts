@@ -65,22 +65,16 @@ try {
     appUrl: process.env.SHOPIFY_APP_URL,
     authPathPrefix: "/auth",
     sessionStorage: new PrismaSessionStorage(prisma),
-    distribution: AppDistribution.SingleMerchant,
+    distribution: AppDistribution.AppStore,
     // Explicitly set isEmbeddedApp to true for immediate authentication
-    // This works with unstable_newEmbeddedAuthStrategy to enable:
-    // - Shopify managed installation (no redirects)
-    // - Token exchange (immediate authentication)
-    // - Seamless sign-up using Shopify credentials
     isEmbeddedApp: true,
     future: {
-      // Use new auth strategy by default, but allow disabling via env var
-      // Set USE_LEGACY_AUTH=true in environment to use old OAuth flow if needed
       unstable_newEmbeddedAuthStrategy: process.env.USE_LEGACY_AUTH !== 'true',
       removeRest: true,
     },
     // Billing configuration - defines all available plans
     billing: {
-      [PLAN_BASE_MONTHLY]: {
+      'base': {
         lineItems: [
           {
             amount: 5.0,
@@ -89,7 +83,7 @@ try {
           },
         ],
       },
-      [PLAN_BASE_YEARLY]: {
+      'base_yearly': {
         lineItems: [
           {
             amount: 45.0,
@@ -98,7 +92,7 @@ try {
           },
         ],
       },
-      [PLAN_MID_MONTHLY]: {
+      'mid': {
         lineItems: [
           {
             amount: 14.0,
@@ -107,7 +101,7 @@ try {
           },
         ],
       },
-      [PLAN_MID_YEARLY]: {
+      'mid_yearly': {
         lineItems: [
           {
             amount: 126.0,
@@ -116,7 +110,7 @@ try {
           },
         ],
       },
-      [PLAN_BASIC_MONTHLY]: {
+      'basic': {
         lineItems: [
           {
             amount: 21.0,
@@ -125,7 +119,7 @@ try {
           },
         ],
       },
-      [PLAN_BASIC_YEARLY]: {
+      'basic_yearly': {
         lineItems: [
           {
             amount: 189.0,
@@ -134,7 +128,7 @@ try {
           },
         ],
       },
-      [PLAN_GROW_MONTHLY]: {
+      'grow': {
         lineItems: [
           {
             amount: 27.0,
@@ -143,7 +137,7 @@ try {
           },
         ],
       },
-      [PLAN_GROW_YEARLY]: {
+      'grow_yearly': {
         lineItems: [
           {
             amount: 243.0,
@@ -152,7 +146,7 @@ try {
           },
         ],
       },
-      [PLAN_PRO_MONTHLY]: {
+      'pro': {
         lineItems: [
           {
             amount: 59.0,
@@ -161,7 +155,7 @@ try {
           },
         ],
       },
-      [PLAN_PRO_YEARLY]: {
+      'pro_yearly': {
         lineItems: [
           {
             amount: 531.0,
@@ -170,7 +164,7 @@ try {
           },
         ],
       },
-      [PLAN_PREMIUM_MONTHLY]: {
+      'premium': {
         lineItems: [
           {
             amount: 134.0,
@@ -179,7 +173,7 @@ try {
           },
         ],
       },
-      [PLAN_PREMIUM_YEARLY]: {
+      'premium_yearly': {
         lineItems: [
           {
             amount: 1206.0,
