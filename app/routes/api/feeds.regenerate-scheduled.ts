@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { regenerateDueFeeds } from "~/services/scheduling/feed-scheduler.server";
+import { regenerateDueFeeds } from "../../services/scheduling/feed-scheduler.server";
 
 /**
  * API endpoint to regenerate feeds based on their timezone schedules

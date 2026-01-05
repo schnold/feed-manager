@@ -1,7 +1,7 @@
-import { FeedRepository } from "~/db/repositories/feed.server";
-import { ShopRepository } from "~/db/repositories/shop.server";
+import { FeedRepository } from "../../db/repositories/feed.server";
+import { ShopRepository } from "../../db/repositories/shop.server";
 import { enqueueFeedGeneration } from "../queue/feed-queue.server";
-import db from "~/db.server";
+import db from "../../db.server";
 
 /**
  * Feed Scheduler Service
