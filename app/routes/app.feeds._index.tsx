@@ -33,9 +33,9 @@ import {
 } from "@shopify/polaris-icons";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  // SECURITY: Require active subscription (minimum BASE plan)
-  // This will throw and redirect to /app/choose-plan if no active subscription
-  const subscription = await requireActivePlan(request, 'base');
+  // SECURITY: Require active subscription (minimum FREE plan)
+  // Free plan allows 1 feed, custom apps can't use Billing API
+  const subscription = await requireActivePlan(request, 'free');
 
   const { session } = await authenticate.admin(request);
 
@@ -73,8 +73,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  // SECURITY: Require active subscription
-  await requireActivePlan(request, 'base');
+  // SECURITY: Require active subscription (minimum FREE plan)
+  await requireActivePlan(request, 'free');
 
   const { session } = await authenticate.admin(request);
 

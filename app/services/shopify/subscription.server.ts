@@ -55,8 +55,8 @@ export async function getCurrentSubscription(request: Request): Promise<Subscrip
 
 /**
  * SECURITY: Require an active subscription with minimum plan level
+ * For custom apps (SingleMerchant), always returns free tier
  * Throws a Response if requirements are not met
- * If no subscription exists, redirects to plan selection page
  */
 export async function requireActivePlan(
   request: Request,
@@ -85,21 +85,32 @@ export async function requireActivePlan(
     throw new Response("Shop not found", { status: 404 });
   }
 
+  // For custom apps, if no subscription exists, return free tier (1 feed limit)
+  // Custom apps cannot use Shopify Billing API
   if (shop.subscriptions.length === 0) {
-    console.log(`[subscription] No active subscription for ${session.shop}, redirecting to plan selection`);
-    // Instead of 403, redirect to plan selection
-    throw new Response(null, {
-      status: 302,
-      headers: {
-        "Location": "/app/choose-plan",
-      },
-    });
+    console.log(`[subscription] No active subscription for ${session.shop}, using free tier`);
+
+    // Update shop with free plan if not set
+    if (!shop.plan || shop.plan === 'basic') {
+      await db.shop.update({
+        where: { id: shop.id },
+        data: { plan: 'free' },
+      });
+    }
+
+    return {
+      plan: 'free',
+      status: 'ACTIVE',
+      name: 'Free Plan',
+      isTest: false,
+      trialEndsAt: null,
+    };
   }
 
   const subscription = shop.subscriptions[0];
 
   // Verify plan meets minimum requirements
-  const planHierarchy = ['base', 'mid', 'basic', 'grow', 'pro', 'premium'];
+  const planHierarchy = ['free', 'base', 'mid', 'basic', 'grow', 'pro', 'premium'];
   const currentPlanIndex = planHierarchy.indexOf(subscription.planId);
   const requiredPlanIndex = planHierarchy.indexOf(minPlan);
 
@@ -172,6 +183,7 @@ export async function canCreateFeed(request: Request): Promise<{ allowed: boolea
  */
 export function getMaxFeedsForPlan(plan: string): number {
   const limits: Record<string, number> = {
+    'free': 1,
     'base': 2,
     'mid': 4,
     'basic': 6,
@@ -180,7 +192,7 @@ export function getMaxFeedsForPlan(plan: string): number {
     'premium': Infinity // Unlimited
   };
 
-  return limits[plan] || limits['basic'];
+  return limits[plan] || limits['free'];
 }
 
 /**
@@ -188,6 +200,7 @@ export function getMaxFeedsForPlan(plan: string): number {
  */
 export function getMaxScheduledUpdatesForPlan(plan: string): number {
   const limits: Record<string, number> = {
+    'free': 0,
     'base': 1,
     'mid': 1,
     'basic': 1,
@@ -196,7 +209,7 @@ export function getMaxScheduledUpdatesForPlan(plan: string): number {
     'premium': 8
   };
 
-  return limits[plan] || limits['basic'];
+  return limits[plan] || 0;
 }
 
 /**

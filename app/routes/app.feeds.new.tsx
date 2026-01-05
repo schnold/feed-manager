@@ -14,8 +14,8 @@ import { requireActivePlan, canCreateFeed } from "../services/shopify/subscripti
 import { createOrUpdateFeedSchedule } from "../services/scheduling/feed-scheduler.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  // SECURITY: Require active subscription (minimum BASE plan)
-  const subscription = await requireActivePlan(request, 'base');
+  // SECURITY: Require active subscription (minimum FREE plan)
+  const subscription = await requireActivePlan(request, 'free');
 
   const { session } = await authenticate.admin(request);
 
@@ -79,7 +79,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   // SECURITY: Require active subscription
-  const subscription = await requireActivePlan(request, 'base');
+  const subscription = await requireActivePlan(request, 'free');
 
   const { session } = await authenticate.admin(request);
 
