@@ -98,27 +98,41 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const currencyCode = pricingDetails.price.currencyCode;
     const interval = pricingDetails.interval;
 
-    // Extract plan ID from subscription name (e.g., "GROW Plan" -> "grow")
-    const planMatch = subscription.name.match(/^(\w+)\s+Plan$/i);
-    const planName = planMatch ? planMatch[1].toUpperCase() : 'BASIC';
+    // Extract plan ID from subscription name and price
+    // The subscription name should match one of our plan names from shopify.server.ts
+    console.log(`[billing-callback] Raw subscription data:`, {
+      name: subscription.name,
+      price: price,
+      interval: interval,
+      currencyCode: currencyCode
+    });
 
-    const planIdMap: Record<string, string> = {
-      'BASE': 'base',
-      'MID': 'mid',
-      'BASIC': 'basic',
-      'GROW': 'grow',
-      'PRO': 'pro',
-      'PREMIUM': 'premium'
-    };
+    // Map price and interval to plan ID
+    // This is more reliable than parsing the name
+    let planId = 'basic'; // default fallback
 
-    let planId = planIdMap[planName] || 'basic';
+    const isYearly = interval === 'ANNUAL';
 
-    // Check if it's yearly based on name or metadata (if we had it)
-    if (subscription.name.toUpperCase().includes('YEARLY') || interval === 'ANNUAL') {
-      planId = `${planId}_yearly`;
+    // Match based on price and interval
+    if (!isYearly) {
+      // Monthly plans
+      if (price === 5) planId = 'base';
+      else if (price === 14) planId = 'mid';
+      else if (price === 21) planId = 'basic';
+      else if (price === 27) planId = 'grow';
+      else if (price === 59) planId = 'pro';
+      else if (price === 134) planId = 'premium';
+    } else {
+      // Yearly plans
+      if (price === 45) planId = 'base_yearly';
+      else if (price === 126) planId = 'mid_yearly';
+      else if (price === 189) planId = 'basic_yearly';
+      else if (price === 243) planId = 'grow_yearly';
+      else if (price === 531) planId = 'pro_yearly';
+      else if (price === 1206) planId = 'premium_yearly';
     }
 
-    console.log(`[billing-callback] Extracted plan info: ${planId}, interval: ${interval}, price: ${price} ${currencyCode}`);
+    console.log(`[billing-callback] Mapped to plan: ${planId} (price: ${price} ${currencyCode}, interval: ${interval})`);
 
     // SECURITY STEP 4: Find or create shop record
     let shop = await db.shop.findUnique({
@@ -183,13 +197,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       });
     }
 
-    // SECURITY STEP 7: Update shop's plan
-    await db.shop.update({
+    // SECURITY STEP 7: Update shop's plan and features
+    const basePlanId = planId.replace('_yearly', '');
+    const planFeatures = PLAN_FEATURES[basePlanId] || PLAN_FEATURES['basic'];
+
+    console.log(`[billing-callback] Updating shop with plan: ${planId}, features:`, planFeatures);
+
+    const updatedShop = await db.shop.update({
       where: { id: shop.id },
       data: {
         plan: planId,
-        features: PLAN_FEATURES[planId.replace('_yearly', '')] || PLAN_FEATURES['basic']
+        features: planFeatures
       } as any,
+    });
+
+    console.log(`[billing-callback] Shop updated successfully:`, {
+      shopId: updatedShop.id,
+      domain: updatedShop.myshopifyDomain,
+      plan: updatedShop.plan,
+      features: updatedShop.features
     });
 
     console.log(`[billing-callback] Successfully processed subscription for ${session.shop}. Plan: ${planId}`);
