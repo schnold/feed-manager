@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { PLAN_FEATURES } from "../services/shopify/subscription.server";
 
 /**
  * SECURITY: Webhook handler for APP_SUBSCRIPTIONS_UPDATE
@@ -117,21 +118,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
       }
 
-      // If subscription is ACTIVE, update shop's plan
+      // If subscription is ACTIVE, update shop's plan and features
       if (subscription.status === 'ACTIVE') {
-        console.log(`[webhook:app_subscriptions_update] Updating shop plan to: ${planId}`);
+        const basePlanId = planId.replace('_yearly', '');
+        const planFeatures = PLAN_FEATURES[basePlanId] || PLAN_FEATURES['free'];
+
+        console.log(`[webhook:app_subscriptions_update] Updating shop plan to: ${planId}, features:`, planFeatures);
         await db.shop.update({
           where: { id: shopRecord.id },
-          data: { plan: planId },
+          data: {
+            plan: planId,
+            features: planFeatures
+          },
         });
       }
 
-      // If subscription is CANCELLED or EXPIRED, revert shop to basic plan
+      // If subscription is CANCELLED or EXPIRED, revert shop to free plan
       if (subscription.status === 'CANCELLED' || subscription.status === 'EXPIRED') {
-        console.log(`[webhook:app_subscriptions_update] Subscription ${subscription.status}, reverting to basic plan`);
+        console.log(`[webhook:app_subscriptions_update] Subscription ${subscription.status}, reverting to free plan`);
         await db.shop.update({
           where: { id: shopRecord.id },
-          data: { plan: 'basic' },
+          data: {
+            plan: 'free',
+            features: PLAN_FEATURES['free']
+          },
         });
       }
 
