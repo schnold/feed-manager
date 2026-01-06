@@ -29,11 +29,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const subscription = payload.app_subscription;
 
+    // Log the ENTIRE webhook payload to see what Shopify is sending
+    console.log(`[webhook:app_subscriptions_update] 🔥 RAW WEBHOOK PAYLOAD:`, JSON.stringify(payload, null, 2));
+
     console.log(`[webhook:app_subscriptions_update] Subscription update:`, {
       id: subscription.admin_graphql_api_id,
       name: subscription.name,
       status: subscription.status,
       shop: shop,
+      test: subscription.test,
+      price: subscription.price,
+      billing_interval: subscription.billing_interval,
     });
 
     // Extract plan ID from subscription name and price
@@ -96,50 +102,76 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         where: { shopifySubscriptionId: subscription.admin_graphql_api_id },
       });
 
-      if (existingSubscription) {
-        console.log(`[webhook:app_subscriptions_update] Updating subscription: ${subscription.admin_graphql_api_id}, planId: ${planId}`);
+      // CRITICAL: Log the exact values we're about to save
+      const webhookDataToSave = {
+        shopId: shopRecord.id,
+        shopifySubscriptionId: subscription.admin_graphql_api_id,
+        name: subscription.name || `${planName} Plan`,
+        status: subscription.status,
+        planId: planId,
+        billingInterval: billingInterval,
+        price: price,
+        currencyCode: currencyCode,
+        isTest: subscription.test || false,
+        trialDays: subscription.trial_days,
+        currentPeriodEnd: subscription.billing_on ? new Date(subscription.billing_on) : null,
+        cancelledAt: subscription.status === 'CANCELLED' ? new Date() : null,
+      };
 
-        await db.subscription.update({
+      console.log(`[webhook:app_subscriptions_update] 🔥 DATA TO SAVE:`, JSON.stringify(webhookDataToSave, null, 2));
+      console.log(`[webhook:app_subscriptions_update] 🔥 CRITICAL VALUES:`, {
+        planId: planId,
+        planIdType: typeof planId,
+        isTest: subscription.test || false,
+        isTestType: typeof (subscription.test || false),
+        rawTest: subscription.test,
+        rawTestType: typeof subscription.test,
+      });
+
+      if (existingSubscription) {
+        console.log(`[webhook:app_subscriptions_update] Updating existing subscription: ${subscription.admin_graphql_api_id}`);
+
+        const updated = await db.subscription.update({
           where: { shopifySubscriptionId: subscription.admin_graphql_api_id },
           data: {
-            name: subscription.name || existingSubscription.name,
-            status: subscription.status,
-            planId,
-            billingInterval,
-            price,
-            currencyCode,
-            isTest: subscription.test || false,
-            trialDays: subscription.trial_days,
-            currentPeriodEnd: subscription.billing_on ? new Date(subscription.billing_on) : null,
-            cancelledAt: subscription.status === 'CANCELLED' ? new Date() : null,
+            name: webhookDataToSave.name,
+            status: webhookDataToSave.status,
+            planId: webhookDataToSave.planId,
+            billingInterval: webhookDataToSave.billingInterval,
+            price: webhookDataToSave.price,
+            currencyCode: webhookDataToSave.currencyCode,
+            isTest: webhookDataToSave.isTest,
+            trialDays: webhookDataToSave.trialDays,
+            currentPeriodEnd: webhookDataToSave.currentPeriodEnd,
+            cancelledAt: webhookDataToSave.cancelledAt,
           },
+        });
+
+        console.log(`[webhook:app_subscriptions_update] ✅ Updated in DB:`, {
+          id: updated.id,
+          shopId: updated.shopId,
+          planId: updated.planId,
+          name: updated.name,
+          status: updated.status,
+          isTest: updated.isTest,
         });
       } else {
-        console.log(`[webhook:app_subscriptions_update] Creating subscription: ${subscription.admin_graphql_api_id}, shopId: ${shopRecord.id}, planId: ${planId}`);
+        console.log(`[webhook:app_subscriptions_update] Creating new subscription: ${subscription.admin_graphql_api_id}`);
 
         const newSub = await db.subscription.create({
-          data: {
-            shopId: shopRecord.id,
-            shopifySubscriptionId: subscription.admin_graphql_api_id,
-            name: subscription.name || `${planName} Plan`,
-            status: subscription.status,
-            planId,
-            billingInterval,
-            price,
-            currencyCode,
-            isTest: subscription.test || false,
-            trialDays: subscription.trial_days,
-            currentPeriodEnd: subscription.billing_on ? new Date(subscription.billing_on) : null,
-            cancelledAt: subscription.status === 'CANCELLED' ? new Date() : null,
-          },
+          data: webhookDataToSave,
         });
 
-        console.log(`[webhook:app_subscriptions_update] Created subscription record:`, {
+        console.log(`[webhook:app_subscriptions_update] ✅ Created in DB:`, {
           id: newSub.id,
           shopId: newSub.shopId,
+          shopifySubscriptionId: newSub.shopifySubscriptionId,
           planId: newSub.planId,
           name: newSub.name,
           status: newSub.status,
+          isTest: newSub.isTest,
+          price: newSub.price,
+          billingInterval: newSub.billingInterval,
         });
       }
 

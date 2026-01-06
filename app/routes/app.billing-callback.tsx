@@ -66,11 +66,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const subscription = data.data.node;
 
+    // Log the ENTIRE raw subscription object to see what Shopify is actually returning
+    console.log(`[billing-callback] RAW Subscription object from Shopify:`, JSON.stringify(subscription, null, 2));
+
     console.log(`[billing-callback] Subscription details:`, {
       id: subscription.id,
       name: subscription.name,
       status: subscription.status,
       test: subscription.test,
+      lineItems: subscription.lineItems,
     });
 
     // SECURITY STEP 2: Verify subscription is ACTIVE
@@ -172,53 +176,70 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       where: { shopifySubscriptionId: subscription.id },
     });
 
+    // CRITICAL: Log the exact values we're about to save to the database
+    const dataToSave = {
+      shopId: shop.id,
+      shopifySubscriptionId: subscription.id,
+      name: subscription.name,
+      status: subscription.status,
+      planId: planId,  // The computed planId from our mapping logic
+      billingInterval: interval,
+      price: price,
+      currencyCode: currencyCode,
+      isTest: subscription.test || false,  // Direct from Shopify
+      trialDays: subscription.trialDays,
+      trialEndsAt: trialEndsAt,
+      currentPeriodEnd: subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null,
+    };
+
+    console.log(`[billing-callback] 🔥 DATA TO SAVE TO DATABASE:`, JSON.stringify(dataToSave, null, 2));
+    console.log(`[billing-callback] 🔥 CRITICAL VALUES:`, {
+      planId: planId,
+      planIdType: typeof planId,
+      isTest: subscription.test || false,
+      isTestType: typeof (subscription.test || false),
+      rawTest: subscription.test,
+      rawTestType: typeof subscription.test,
+    });
+
     if (existingSubscription) {
       console.log(`[billing-callback] Updating existing subscription ${subscription.id}`);
       const updatedSub = await db.subscription.update({
         where: { shopifySubscriptionId: subscription.id },
         data: {
-          status: subscription.status,
-          planId,
-          billingInterval: interval,
-          price,
-          currencyCode,
-          isTest: subscription.test || false,
-          trialDays: subscription.trialDays,
-          trialEndsAt,
-          currentPeriodEnd: subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null,
+          status: dataToSave.status,
+          planId: dataToSave.planId,
+          billingInterval: dataToSave.billingInterval,
+          price: dataToSave.price,
+          currencyCode: dataToSave.currencyCode,
+          isTest: dataToSave.isTest,
+          trialDays: dataToSave.trialDays,
+          trialEndsAt: dataToSave.trialEndsAt,
+          currentPeriodEnd: dataToSave.currentPeriodEnd,
         },
       });
-      console.log(`[billing-callback] Updated subscription:`, {
+      console.log(`[billing-callback] ✅ Updated subscription in DB:`, {
         id: updatedSub.id,
         shopId: updatedSub.shopId,
         planId: updatedSub.planId,
         status: updatedSub.status,
+        isTest: updatedSub.isTest,
       });
     } else {
       console.log(`[billing-callback] Creating new subscription record for ${subscription.id}, shopId: ${shop.id}`);
       const newSub = await db.subscription.create({
-        data: {
-          shopId: shop.id,
-          shopifySubscriptionId: subscription.id,
-          name: subscription.name,
-          status: subscription.status,
-          planId,
-          billingInterval: interval,
-          price,
-          currencyCode,
-          isTest: subscription.test || false,
-          trialDays: subscription.trialDays,
-          trialEndsAt,
-          currentPeriodEnd: subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null,
-        },
+        data: dataToSave,
       });
-      console.log(`[billing-callback] Created subscription:`, {
+      console.log(`[billing-callback] ✅ Created subscription in DB:`, {
         id: newSub.id,
         shopId: newSub.shopId,
         shopifySubscriptionId: newSub.shopifySubscriptionId,
         planId: newSub.planId,
         status: newSub.status,
         name: newSub.name,
+        isTest: newSub.isTest,
+        price: newSub.price,
+        billingInterval: newSub.billingInterval,
       });
     }
 
