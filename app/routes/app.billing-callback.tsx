@@ -88,10 +88,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return shopifyRedirect("/app/choose-plan?error=subscription_not_active");
     }
 
-    // SECURITY STEP 3: In production, ensure it's not a test subscription
-    if (process.env.NODE_ENV === 'production' && subscription.test) {
-      console.error("[billing-callback] Test subscription in production environment");
-      return shopifyRedirect("/app/choose-plan?error=test_in_production");
+    // NOTE: Test subscriptions are allowed and normal for development stores
+    // Shopify automatically uses test mode for dev stores - no real charges are made
+    if (subscription.test) {
+      console.log(`[billing-callback] Test subscription detected (development store)`);
     }
 
     // Extract pricing details

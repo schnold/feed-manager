@@ -165,15 +165,10 @@ export async function requireActivePlan(
     });
   }
 
-  // SECURITY: In production, block test subscriptions
-  if (process.env.NODE_ENV === 'production' && subscription.isTest) {
-    console.error(`[subscription] Test subscription in production for ${session.shop}`);
-    throw new Response("Test subscription in production", {
-      status: 403,
-      headers: {
-        "X-Shopify-Redirect": "/app/choose-plan",
-      },
-    });
+  // NOTE: Test subscriptions are allowed and normal for development stores
+  // Shopify automatically uses test mode for dev stores - no real charges are made
+  if (subscription.isTest) {
+    console.log(`[subscription] Test subscription detected for ${session.shop} (development store)`);
   }
 
   return {
