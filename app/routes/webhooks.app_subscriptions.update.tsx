@@ -36,10 +36,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       shop: shop,
     });
 
-    // Extract plan ID from subscription name
+    // Extract plan ID from subscription name and price
+    // Match plan name from subscription (e.g., "BASE Plan", "GROW Plan")
     const planMatch = subscription.name?.match(/^(\w+)\s+Plan$/i);
     const planName = planMatch ? planMatch[1].toUpperCase() : 'BASIC';
 
+    // Extract pricing info if available
+    const price = subscription.price ? parseFloat(subscription.price) : 0;
+    const currencyCode = subscription.currency || 'EUR';
+
+    // Determine billing interval - check if yearly
+    const billingInterval = subscription.billing_interval === 'ANNUAL' || subscription.billing_interval === 'Annual' || subscription.billing_interval === 'annual' ? 'ANNUAL' : 'EVERY_30_DAYS';
+    const isYearly = billingInterval === 'ANNUAL';
+
+    console.log(`[webhook:app_subscriptions_update] Subscription pricing:`, {
+      price,
+      billingInterval,
+      isYearly,
+      planName,
+    });
+
+    // Map plan name to plan ID, adding _yearly suffix if applicable
     const planIdMap: Record<string, string> = {
       'BASE': 'base',
       'MID': 'mid',
@@ -49,7 +66,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       'PREMIUM': 'premium'
     };
 
-    const planId = planIdMap[planName] || 'basic';
+    let planId = planIdMap[planName] || 'basic';
+
+    // Add yearly suffix if this is an annual subscription
+    if (isYearly) {
+      planId = `${planId}_yearly`;
+    }
+
+    console.log(`[webhook:app_subscriptions_update] Mapped plan: ${planName} -> ${planId}`);
 
     // Find the shop
     const shopRecord = await db.shop.findUnique({
@@ -72,15 +96,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         where: { shopifySubscriptionId: subscription.admin_graphql_api_id },
       });
 
-      // Extract pricing info if available
-      const price = subscription.price ? parseFloat(subscription.price) : 0;
-      const currencyCode = subscription.currency || 'EUR';
-
-      // Determine billing interval from subscription data
-      const billingInterval = subscription.billing_interval === 'ANNUAL' ? 'ANNUAL' : 'EVERY_30_DAYS';
-
       if (existingSubscription) {
-        console.log(`[webhook:app_subscriptions_update] Updating subscription: ${subscription.admin_graphql_api_id}`);
+        console.log(`[webhook:app_subscriptions_update] Updating subscription: ${subscription.admin_graphql_api_id}, planId: ${planId}`);
 
         await db.subscription.update({
           where: { shopifySubscriptionId: subscription.admin_graphql_api_id },
@@ -98,9 +115,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           },
         });
       } else {
-        console.log(`[webhook:app_subscriptions_update] Creating subscription: ${subscription.admin_graphql_api_id}`);
+        console.log(`[webhook:app_subscriptions_update] Creating subscription: ${subscription.admin_graphql_api_id}, shopId: ${shopRecord.id}, planId: ${planId}`);
 
-        await db.subscription.create({
+        const newSub = await db.subscription.create({
           data: {
             shopId: shopRecord.id,
             shopifySubscriptionId: subscription.admin_graphql_api_id,
@@ -115,6 +132,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             currentPeriodEnd: subscription.billing_on ? new Date(subscription.billing_on) : null,
             cancelledAt: subscription.status === 'CANCELLED' ? new Date() : null,
           },
+        });
+
+        console.log(`[webhook:app_subscriptions_update] Created subscription record:`, {
+          id: newSub.id,
+          shopId: newSub.shopId,
+          planId: newSub.planId,
+          name: newSub.name,
+          status: newSub.status,
         });
       }
 

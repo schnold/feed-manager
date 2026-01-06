@@ -104,35 +104,46 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       name: subscription.name,
       price: price,
       interval: interval,
-      currencyCode: currencyCode
+      currencyCode: currencyCode,
+      rawInterval: pricingDetails.interval,
     });
 
+    // Helper function to compare prices with tolerance for floating point
+    const priceMatches = (expected: number) => Math.abs(price - expected) < 0.01;
+
+    // Check if interval is yearly (handle different formats)
+    const isYearly = interval === 'ANNUAL' || interval === 'Annual' || interval === 'annual';
+
     // Map price and interval to plan ID
-    // This is more reliable than parsing the name
     let planId = 'basic'; // default fallback
 
-    const isYearly = interval === 'ANNUAL';
-
-    // Match based on price and interval
+    // Match based on price and interval with tolerance
     if (!isYearly) {
       // Monthly plans
-      if (price === 5) planId = 'base';
-      else if (price === 14) planId = 'mid';
-      else if (price === 21) planId = 'basic';
-      else if (price === 27) planId = 'grow';
-      else if (price === 59) planId = 'pro';
-      else if (price === 134) planId = 'premium';
+      if (priceMatches(5)) planId = 'base';
+      else if (priceMatches(14)) planId = 'mid';
+      else if (priceMatches(21)) planId = 'basic';
+      else if (priceMatches(27)) planId = 'grow';
+      else if (priceMatches(59)) planId = 'pro';
+      else if (priceMatches(134)) planId = 'premium';
+      else {
+        console.warn(`[billing-callback] Unknown monthly price: ${price}, defaulting to basic`);
+      }
     } else {
       // Yearly plans
-      if (price === 45) planId = 'base_yearly';
-      else if (price === 126) planId = 'mid_yearly';
-      else if (price === 189) planId = 'basic_yearly';
-      else if (price === 243) planId = 'grow_yearly';
-      else if (price === 531) planId = 'pro_yearly';
-      else if (price === 1206) planId = 'premium_yearly';
+      if (priceMatches(45)) planId = 'base_yearly';
+      else if (priceMatches(126)) planId = 'mid_yearly';
+      else if (priceMatches(189)) planId = 'basic_yearly';
+      else if (priceMatches(243)) planId = 'grow_yearly';
+      else if (priceMatches(531)) planId = 'pro_yearly';
+      else if (priceMatches(1206)) planId = 'premium_yearly';
+      else {
+        console.warn(`[billing-callback] Unknown yearly price: ${price}, defaulting to basic_yearly`);
+        planId = 'basic_yearly';
+      }
     }
 
-    console.log(`[billing-callback] Mapped to plan: ${planId} (price: ${price} ${currencyCode}, interval: ${interval})`);
+    console.log(`[billing-callback] Mapped to plan: ${planId} (price: ${price} ${currencyCode}, interval: ${interval}, isYearly: ${isYearly})`);
 
     // SECURITY STEP 4: Find or create shop record
     let shop = await db.shop.findUnique({
@@ -163,7 +174,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     if (existingSubscription) {
       console.log(`[billing-callback] Updating existing subscription ${subscription.id}`);
-      await db.subscription.update({
+      const updatedSub = await db.subscription.update({
         where: { shopifySubscriptionId: subscription.id },
         data: {
           status: subscription.status,
@@ -177,9 +188,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           currentPeriodEnd: subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null,
         },
       });
+      console.log(`[billing-callback] Updated subscription:`, {
+        id: updatedSub.id,
+        shopId: updatedSub.shopId,
+        planId: updatedSub.planId,
+        status: updatedSub.status,
+      });
     } else {
-      console.log(`[billing-callback] Creating new subscription record for ${subscription.id}`);
-      await db.subscription.create({
+      console.log(`[billing-callback] Creating new subscription record for ${subscription.id}, shopId: ${shop.id}`);
+      const newSub = await db.subscription.create({
         data: {
           shopId: shop.id,
           shopifySubscriptionId: subscription.id,
@@ -194,6 +211,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           trialEndsAt,
           currentPeriodEnd: subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null,
         },
+      });
+      console.log(`[billing-callback] Created subscription:`, {
+        id: newSub.id,
+        shopId: newSub.shopId,
+        shopifySubscriptionId: newSub.shopifySubscriptionId,
+        planId: newSub.planId,
+        status: newSub.status,
+        name: newSub.name,
       });
     }
 
@@ -231,11 +256,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     console.log(`[billing-callback] VERIFICATION - Shop after update:`, {
+      shopId: verifyShop?.id,
+      shopDomain: verifyShop?.myshopifyDomain,
       plan: verifyShop?.plan,
       features: verifyShop?.features,
+      totalSubscriptions: await db.subscription.count({ where: { shopId: shop.id } }),
       activeSubscription: verifyShop?.subscriptions[0] ? {
+        id: verifyShop.subscriptions[0].id,
+        shopId: verifyShop.subscriptions[0].shopId,
         planId: verifyShop.subscriptions[0].planId,
         status: verifyShop.subscriptions[0].status,
+        name: verifyShop.subscriptions[0].name,
       } : null
     });
 
