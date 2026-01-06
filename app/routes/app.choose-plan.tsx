@@ -71,15 +71,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const shop = session.shop;
     const host = url.searchParams.get("host");
 
-    let returnUrl = `${process.env.SHOPIFY_APP_URL}/app/billing-callback`;
-    if (shop) {
-      returnUrl += `?shop=${shop}`;
-      if (host) {
-        returnUrl += `&host=${host}`;
-      }
-    }
+    // CRITICAL: After approval, Shopify redirects to the embedded app
+    // The app should use billing.check() to verify subscription, not a custom callback
+    // Return to the feeds page where billing.check() will sync the subscription
+    const storeHandle = shop.replace('.myshopify.com', '');
+    const appHandle = process.env.SHOPIFY_APP_HANDLE || 'feed-manager';
+    let returnUrl = `https://admin.shopify.com/store/${storeHandle}/apps/${appHandle}/app/feeds?subscription=success`;
 
-    console.log(`[choose-plan] Using returnUrl: ${returnUrl}`);
+    console.log(`[choose-plan] Using Shopify Admin embedded returnUrl: ${returnUrl}`);
 
     await billing.request({
       plan: planKey as any,

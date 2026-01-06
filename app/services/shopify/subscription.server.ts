@@ -290,3 +290,205 @@ export async function verifySubscriptionFromShopify(
     return { valid: false, status: 'ERROR', isTest: false };
   }
 }
+
+/**
+ * CRITICAL: Sync subscription from Shopify after billing approval
+ * This is the state-of-the-art approach per Shopify MCP documentation
+ * Uses billing.check() instead of custom callback routes
+ */
+export async function syncSubscriptionFromShopify(
+  shopDomain: string,
+  billing: any,
+  admin: any
+): Promise<void> {
+  console.log(`[syncSubscription] 🔥 Starting subscription sync for ${shopDomain}`);
+
+  try {
+    // STEP 1: Use billing.check() to verify active subscriptions
+    const { hasActivePayment, appSubscriptions } = await billing.check();
+
+    console.log(`[syncSubscription] Billing check result:`, {
+      hasActivePayment,
+      subscriptionCount: appSubscriptions?.length || 0,
+    });
+
+    if (!hasActivePayment || !appSubscriptions || appSubscriptions.length === 0) {
+      console.log(`[syncSubscription] No active subscriptions found for ${shopDomain}`);
+      return;
+    }
+
+    // STEP 2: Get the most recent active subscription
+    const activeSubscription = appSubscriptions[0];
+    console.log(`[syncSubscription] Active subscription ID: ${activeSubscription.id}`);
+
+    // STEP 3: Query full subscription details via GraphQL
+    const query = `
+      query getSubscription($id: ID!) {
+        node(id: $id) {
+          ... on AppSubscription {
+            id
+            name
+            status
+            test
+            createdAt
+            currentPeriodEnd
+            trialDays
+            lineItems {
+              id
+              plan {
+                pricingDetails {
+                  ... on AppRecurringPricing {
+                    price {
+                      amount
+                      currencyCode
+                    }
+                    interval
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await admin.graphql(query, {
+      variables: { id: activeSubscription.id },
+    });
+
+    const data = await response.json() as any;
+
+    if (data.errors || !data.data?.node) {
+      console.error(`[syncSubscription] GraphQL errors:`, data.errors);
+      throw new Error('Failed to query subscription details');
+    }
+
+    const subscription = data.data.node;
+    console.log(`[syncSubscription] 🔥 RAW Subscription from Shopify:`, JSON.stringify(subscription, null, 2));
+
+    // STEP 4: Extract pricing details
+    const lineItem = subscription.lineItems?.[0];
+    const pricingDetails = lineItem?.plan?.pricingDetails;
+
+    if (!pricingDetails || !pricingDetails.price) {
+      console.error(`[syncSubscription] No pricing details found`);
+      throw new Error('No pricing details found');
+    }
+
+    const price = parseFloat(pricingDetails.price.amount);
+    const currencyCode = pricingDetails.price.currencyCode;
+    const interval = pricingDetails.interval;
+
+    // STEP 5: Map price and interval to planId
+    const priceMatches = (expected: number) => Math.abs(price - expected) < 0.01;
+    const isYearly = interval === 'ANNUAL' || interval === 'Annual' || interval === 'annual';
+
+    let planId = 'basic'; // default fallback
+
+    if (!isYearly) {
+      // Monthly plans
+      if (priceMatches(5)) planId = 'base';
+      else if (priceMatches(14)) planId = 'mid';
+      else if (priceMatches(21)) planId = 'basic';
+      else if (priceMatches(27)) planId = 'grow';
+      else if (priceMatches(59)) planId = 'pro';
+      else if (priceMatches(134)) planId = 'premium';
+      else {
+        console.warn(`[syncSubscription] Unknown monthly price: ${price}, defaulting to basic`);
+      }
+    } else {
+      // Yearly plans
+      if (priceMatches(45)) planId = 'base_yearly';
+      else if (priceMatches(126)) planId = 'mid_yearly';
+      else if (priceMatches(189)) planId = 'basic_yearly';
+      else if (priceMatches(243)) planId = 'grow_yearly';
+      else if (priceMatches(531)) planId = 'pro_yearly';
+      else if (priceMatches(1206)) planId = 'premium_yearly';
+      else {
+        console.warn(`[syncSubscription] Unknown yearly price: ${price}, defaulting to basic_yearly`);
+        planId = 'basic_yearly';
+      }
+    }
+
+    console.log(`[syncSubscription] Mapped to plan: ${planId} (price: ${price} ${currencyCode}, interval: ${interval})`);
+
+    // STEP 6: Find or create shop record
+    let shop = await db.shop.findUnique({
+      where: { myshopifyDomain: shopDomain },
+    });
+
+    if (!shop) {
+      console.error(`[syncSubscription] Shop not found: ${shopDomain}`);
+      throw new Error('Shop not found');
+    }
+
+    // STEP 7: Calculate trial end date
+    const trialEndsAt = subscription.trialDays
+      ? new Date(Date.now() + subscription.trialDays * 24 * 60 * 60 * 1000)
+      : null;
+
+    // STEP 8: Save/update subscription in database
+    const dataToSave = {
+      shopId: shop.id,
+      shopifySubscriptionId: subscription.id,
+      name: subscription.name,
+      status: subscription.status,
+      planId: planId,
+      billingInterval: interval,
+      price: price,
+      currencyCode: currencyCode,
+      isTest: subscription.test || false,
+      trialDays: subscription.trialDays || 0,
+      trialEndsAt: trialEndsAt,
+      currentPeriodEnd: subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null,
+    };
+
+    console.log(`[syncSubscription] 🔥 DATA TO SAVE:`, JSON.stringify(dataToSave, null, 2));
+
+    const existingSubscription = await db.subscription.findUnique({
+      where: { shopifySubscriptionId: subscription.id },
+    });
+
+    if (existingSubscription) {
+      console.log(`[syncSubscription] Updating existing subscription ${subscription.id}`);
+      await db.subscription.update({
+        where: { shopifySubscriptionId: subscription.id },
+        data: {
+          status: dataToSave.status,
+          planId: dataToSave.planId,
+          billingInterval: dataToSave.billingInterval,
+          price: dataToSave.price,
+          currencyCode: dataToSave.currencyCode,
+          isTest: dataToSave.isTest,
+          trialDays: dataToSave.trialDays,
+          trialEndsAt: dataToSave.trialEndsAt,
+          currentPeriodEnd: dataToSave.currentPeriodEnd,
+        },
+      });
+    } else {
+      console.log(`[syncSubscription] Creating new subscription record`);
+      await db.subscription.create({
+        data: dataToSave,
+      });
+    }
+
+    // STEP 9: Update shop's plan and features
+    const basePlanId = planId.replace('_yearly', '');
+    const planFeatures = PLAN_FEATURES[basePlanId] || PLAN_FEATURES['free'];
+
+    console.log(`[syncSubscription] Updating shop with plan: ${planId}, features:`, planFeatures);
+    await db.shop.update({
+      where: { id: shop.id },
+      data: {
+        plan: planId,
+        features: planFeatures
+      },
+    });
+
+    console.log(`[syncSubscription] ✅ Successfully synced subscription for ${shopDomain}, plan: ${planId}`);
+
+  } catch (error) {
+    console.error(`[syncSubscription] Error syncing subscription:`, error);
+    throw error;
+  }
+}

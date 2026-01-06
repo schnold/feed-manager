@@ -9,15 +9,20 @@ import { PLAN_FEATURES } from "../services/shopify/subscription.server";
  * It verifies the subscription was approved and saves it to the database
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, session, redirect: shopifyRedirect } = await authenticate.admin(request);
-
   const url = new URL(request.url);
+  console.log(`[billing-callback] 🚀 CALLBACK STARTED - URL: ${url.toString()}`);
+
+  const { admin, session, redirect: shopifyRedirect } = await authenticate.admin(request);
+  console.log(`[billing-callback] ✅ Authentication successful for shop: ${session.shop}`);
+
   const chargeId = url.searchParams.get("charge_id");
 
   if (!chargeId) {
     console.error("[billing-callback] No charge_id provided in callback URL");
     return shopifyRedirect("/app/choose-plan?error=no_charge_id");
   }
+
+  console.log(`[billing-callback] Charge ID: ${chargeId}`);
 
   try {
     // SECURITY STEP 1: Verify the subscription exists and get its details

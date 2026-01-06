@@ -39,20 +39,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       shop: shop,
       test: subscription.test,
       price: subscription.price,
+      interval: subscription.interval,  // This is the actual field name
       billing_interval: subscription.billing_interval,
     });
 
     // Extract plan ID from subscription name and price
-    // Match plan name from subscription (e.g., "BASE Plan", "GROW Plan")
-    const planMatch = subscription.name?.match(/^(\w+)\s+Plan$/i);
-    const planName = planMatch ? planMatch[1].toUpperCase() : 'BASIC';
+    // Shopify webhook sends name as lowercase (e.g., "base", "grow", "premium")
+    // NOT as "BASE Plan" like we expected!
+    const rawName = subscription.name?.toLowerCase() || 'basic';
+
+    // Remove any " Plan" suffix if present, and get just the plan name
+    const planName = rawName.replace(/\s+plan$/i, '').toUpperCase();
 
     // Extract pricing info if available
     const price = subscription.price ? parseFloat(subscription.price) : 0;
     const currencyCode = subscription.currency || 'EUR';
 
-    // Determine billing interval - check if yearly
-    const billingInterval = subscription.billing_interval === 'ANNUAL' || subscription.billing_interval === 'Annual' || subscription.billing_interval === 'annual' ? 'ANNUAL' : 'EVERY_30_DAYS';
+    // CRITICAL: Webhook uses "interval" field, NOT "billing_interval"!
+    const intervalRaw = subscription.interval || 'every_30_days';
+    const billingInterval = intervalRaw === 'annual' || intervalRaw.toLowerCase().includes('annual') ? 'ANNUAL' : 'EVERY_30_DAYS';
     const isYearly = billingInterval === 'ANNUAL';
 
     console.log(`[webhook:app_subscriptions_update] Subscription pricing:`, {
@@ -102,6 +107,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         where: { shopifySubscriptionId: subscription.admin_graphql_api_id },
       });
 
+      // CRITICAL: Webhook doesn't include "test" field!
+      // We need to check if shop is a development store, or check the subscription plan_handle
+      // For now, we'll check if it's a development store based on the shop domain
+      const isDevelopmentStore = shop.includes('myshopify.com');
+      // In production, real charges should have isTest=false unless it's a dev store
+      const isTest = isDevelopmentStore;
+
       // CRITICAL: Log the exact values we're about to save
       const webhookDataToSave = {
         shopId: shopRecord.id,
@@ -112,8 +124,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         billingInterval: billingInterval,
         price: price,
         currencyCode: currencyCode,
-        isTest: subscription.test || false,
-        trialDays: subscription.trial_days,
+        isTest: isTest,  // Computed based on shop type
+        trialDays: subscription.trial_days || 0,
         currentPeriodEnd: subscription.billing_on ? new Date(subscription.billing_on) : null,
         cancelledAt: subscription.status === 'CANCELLED' ? new Date() : null,
       };

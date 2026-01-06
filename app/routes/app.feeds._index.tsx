@@ -8,7 +8,7 @@ import { FeedRepository } from "../db/repositories/feed.server";
 import { deleteXmlFromS3 } from "../services/storage/s3.server";
 import { enqueueFeedGeneration } from "../services/queue/feed-queue.server";
 import { getCurrencyDisplay } from "../utils/currency";
-import { requireActivePlan, getMaxFeedsForPlan } from "../services/shopify/subscription.server";
+import { requireActivePlan, getMaxFeedsForPlan, syncSubscriptionFromShopify } from "../services/shopify/subscription.server";
 import { getNextScheduledRun } from "../services/scheduling/feed-scheduler.server";
 import {
   Page,
@@ -33,11 +33,25 @@ import {
 } from "@shopify/polaris-icons";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { session, billing, admin } = await authenticate.admin(request);
+  const url = new URL(request.url);
+
+  // CRITICAL: After billing approval, sync subscription from Shopify
+  // This is the state-of-the-art approach per Shopify docs
+  const subscriptionParam = url.searchParams.get('subscription');
+  if (subscriptionParam === 'success') {
+    console.log(`[feeds._index] 🔥 Billing success detected, syncing subscription for ${session.shop}`);
+    try {
+      await syncSubscriptionFromShopify(session.shop, billing, admin);
+    } catch (error) {
+      console.error('[feeds._index] Failed to sync subscription:', error);
+      // Continue loading - don't block the user
+    }
+  }
+
   // SECURITY: Require active subscription (minimum FREE plan)
   // Free plan allows 1 feed, custom apps can't use Billing API
   const subscription = await requireActivePlan(request, 'free');
-
-  const { session } = await authenticate.admin(request);
 
   // Get existing shop (should already exist from OAuth/install)
   let shop = await ShopRepository.findByDomain(session.shop);
