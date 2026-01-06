@@ -5,11 +5,21 @@ import { FeedRepository } from "../../db/repositories/feed.server";
 import { enqueueFeedGeneration } from "../../services/queue/feed-queue.server";
 
 /**
- * API endpoint to regenerate all feeds for a shop or all shops
- * This can be called by:
- * - Cron jobs (scheduled tasks)
- * - Netlify scheduled functions
- * - External automation services
+ * ⚠️ DEPRECATED: Use /api/feeds/regenerate-scheduled instead
+ * 
+ * This endpoint regenerates ALL feeds without checking subscription plans.
+ * It should only be used for:
+ * - Manual administrative tasks
+ * - Emergency feed regeneration
+ * - Bulk operations
+ * 
+ * For automated scheduled regeneration that respects plan limits, use:
+ * POST /api/feeds/regenerate-scheduled
+ * 
+ * This endpoint does NOT:
+ * - Check if shops are on free plan (will regenerate anyway)
+ * - Respect daily update limits per plan
+ * - Check timezone-aware scheduling
  * 
  * Authentication: Uses a secret token (FEED_REGENERATION_SECRET)
  * 
@@ -33,6 +43,11 @@ export async function action({ request }: ActionFunctionArgs) {
       console.warn("Invalid regeneration secret provided");
       return json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    console.warn(
+      "⚠️ DEPRECATED ENDPOINT: /api/feeds/regenerate-all is deprecated. " +
+      "Use /api/feeds/regenerate-scheduled for plan-aware scheduled regeneration."
+    );
 
     // Parse the request body
     const body = await request.json().catch(() => ({}));
@@ -112,10 +127,17 @@ export async function action({ request }: ActionFunctionArgs) {
 // Also support GET for simple health checks
 export async function loader() {
   return json({
-    endpoint: "Feed Regeneration API",
+    endpoint: "Feed Regeneration API (DEPRECATED)",
+    warning: "⚠️ This endpoint is deprecated. Use /api/feeds/regenerate-scheduled instead.",
     method: "POST",
     authentication: "X-Regeneration-Secret header required",
-    documentation: "Use POST with optional shopDomain in body to regenerate feeds"
+    documentation: "Use POST with optional shopDomain in body to regenerate feeds",
+    limitations: [
+      "Does not check subscription plans (will regenerate free plan feeds)",
+      "Does not respect daily update limits",
+      "Does not use timezone-aware scheduling"
+    ],
+    recommendation: "Use /api/feeds/regenerate-scheduled for production scheduled regeneration"
   });
 }
 

@@ -44,7 +44,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
     console.log(
       `[Scheduled Regeneration] Processed ${result.totalFeeds} feeds: ` +
-      `${result.enqueuedFeeds} enqueued, ${result.skippedFeeds} skipped`
+      `${result.enqueuedFeeds} enqueued, ${result.skippedFeeds} skipped, ` +
+      `${result.skippedFreePlan} skipped (free plan)`
     );
 
     if (result.errors.length > 0) {
@@ -59,6 +60,7 @@ export async function action({ request }: ActionFunctionArgs) {
         dueFeeds: result.dueFeeds,
         enqueuedFeeds: result.enqueuedFeeds,
         skippedFeeds: result.skippedFeeds,
+        skippedFreePlan: result.skippedFreePlan,
         failedFeeds: result.errors.length
       },
       errors: result.errors.length > 0 ? result.errors : undefined
