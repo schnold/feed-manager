@@ -105,7 +105,7 @@ export async function requireActivePlan(
   const { session } = await authenticate.admin(request);
 
   // Get subscription from database
-  const shop = await db.shop.findUnique({
+  let shop = await db.shop.findUnique({
     where: { myshopifyDomain: session.shop },
     include: {
       subscriptions: {
@@ -199,7 +199,7 @@ export async function requireActivePlan(
 export async function canCreateFeed(request: Request): Promise<{ allowed: boolean; currentCount: number; maxAllowed: number; plan: string }> {
   const { session } = await authenticate.admin(request);
 
-  const shop = await db.shop.findUnique({
+  let shop = await db.shop.findUnique({
     where: { myshopifyDomain: session.shop },
     include: {
       feeds: true,
