@@ -121,8 +121,20 @@ export async function requireActivePlan(
   });
 
   if (!shop) {
-    console.error(`[subscription] Shop not found: ${session.shop}`);
-    throw new Response("Shop not found", { status: 404 });
+    // Shop doesn't exist yet - create it with free plan (first install)
+    console.log(`[subscription] Shop not found: ${session.shop}, creating with free plan`);
+    shop = await db.shop.create({
+      data: {
+        myshopifyDomain: session.shop,
+        accessToken: session.accessToken || '',
+        plan: 'free',
+        features: PLAN_FEATURES['free']
+      },
+      include: {
+        subscriptions: true
+      }
+    });
+    console.log(`[subscription] Created new shop: ${session.shop}`);
   }
 
   // For custom apps, if no subscription exists, return free tier (1 feed limit)
@@ -200,7 +212,20 @@ export async function canCreateFeed(request: Request): Promise<{ allowed: boolea
   });
 
   if (!shop) {
-    throw new Response("Shop not found", { status: 404 });
+    // Shop doesn't exist yet - create it with free plan (first install)
+    console.log(`[canCreateFeed] Shop not found: ${session.shop}, creating with free plan`);
+    shop = await db.shop.create({
+      data: {
+        myshopifyDomain: session.shop,
+        accessToken: session.accessToken || '',
+        plan: 'free',
+        features: PLAN_FEATURES['free']
+      },
+      include: {
+        feeds: true,
+        subscriptions: true
+      }
+    });
   }
 
   const plan = shop.subscriptions[0]?.planId || shop.plan || 'free';
@@ -413,8 +438,16 @@ export async function syncSubscriptionFromShopify(
     });
 
     if (!shop) {
-      console.error(`[syncSubscription] Shop not found: ${shopDomain}`);
-      throw new Error('Shop not found');
+      // Shop doesn't exist yet - create it with free plan (will be upgraded below)
+      console.log(`[syncSubscription] Shop not found: ${shopDomain}, creating new shop record`);
+      shop = await db.shop.create({
+        data: {
+          myshopifyDomain: shopDomain,
+          accessToken: '', // Will need to be updated separately
+          plan: 'free',
+          features: PLAN_FEATURES['free']
+        }
+      });
     }
 
     // STEP 7: Calculate trial end date
