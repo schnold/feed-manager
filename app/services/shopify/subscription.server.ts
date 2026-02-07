@@ -164,8 +164,10 @@ export async function requireActivePlan(
 
   // Verify plan meets minimum requirements
   const planHierarchy = ['free', 'base', 'mid', 'basic', 'grow', 'pro', 'premium'];
-  const currentPlanIndex = planHierarchy.indexOf(subscription.planId);
-  const requiredPlanIndex = planHierarchy.indexOf(minPlan);
+  const normalizePlanId = (id: string) => id.replace('_yearly', '');
+
+  const currentPlanIndex = planHierarchy.indexOf(normalizePlanId(subscription.planId));
+  const requiredPlanIndex = planHierarchy.indexOf(normalizePlanId(minPlan));
 
   if (currentPlanIndex < requiredPlanIndex) {
     console.log(`[subscription] Plan upgrade required. Current: ${subscription.planId}, Required: ${minPlan}`);
@@ -189,7 +191,7 @@ export async function requireActivePlan(
     name: subscription.name,
     isTest: subscription.isTest,
     trialEndsAt: subscription.trialEndsAt,
-    features: shop.features || PLAN_FEATURES[subscription.planId] || PLAN_FEATURES['free']
+    features: shop.features || PLAN_FEATURES[normalizePlanId(subscription.planId)] || PLAN_FEATURES['free']
   };
 }
 
@@ -255,14 +257,16 @@ export async function canCreateFeed(request: Request): Promise<{ allowed: boolea
  * Get the maximum number of feeds allowed for a plan
  */
 export function getMaxFeedsForPlan(plan: string): number {
-  return PLAN_FEATURES[plan]?.maxFeeds || PLAN_FEATURES['free'].maxFeeds;
+  const normalizedPlan = plan.replace('_yearly', '');
+  return PLAN_FEATURES[normalizedPlan]?.maxFeeds || PLAN_FEATURES['free'].maxFeeds;
 }
 
 /**
  * Get the maximum number of scheduled updates per day for a plan
  */
 export function getMaxScheduledUpdatesForPlan(plan: string): number {
-  return PLAN_FEATURES[plan]?.maxScheduledUpdates || PLAN_FEATURES['free'].maxScheduledUpdates;
+  const normalizedPlan = plan.replace('_yearly', '');
+  return PLAN_FEATURES[normalizedPlan]?.maxScheduledUpdates || PLAN_FEATURES['free'].maxScheduledUpdates;
 }
 
 /**

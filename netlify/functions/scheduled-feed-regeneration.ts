@@ -39,6 +39,12 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
   const siteUrl = process.env.URL || process.env.DEPLOY_PRIME_URL || "http://localhost:3000";
   const apiUrl = `${siteUrl}/api/feeds/regenerate-scheduled`;
 
+  console.log(`[Scheduled Function] Configuration:`, {
+    siteUrl,
+    hasSecret: !!secret,
+    secretLength: secret ? secret.length : 0
+  });
+
   try {
     console.log(`Calling timezone-aware regeneration API: ${apiUrl}`);
 

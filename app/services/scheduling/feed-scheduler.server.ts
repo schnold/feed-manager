@@ -60,7 +60,7 @@ function getScheduledHours(maxUpdatesPerDay: number): number[] {
   if (maxUpdatesPerDay === 2) return [2, 14]; // 2 AM, 2 PM
   if (maxUpdatesPerDay === 4) return [2, 8, 14, 20]; // Every 6 hours
   if (maxUpdatesPerDay === 8) return [2, 5, 8, 11, 14, 17, 20, 23]; // Every 3 hours
-  
+
   // For other values, distribute evenly throughout the day
   const interval = Math.floor(24 / maxUpdatesPerDay);
   return Array.from({ length: maxUpdatesPerDay }, (_, i) => (2 + i * interval) % 24);
@@ -74,49 +74,126 @@ export function shouldRegenerateNow(
   timezone: string,
   lastRunAt: Date | null,
   maxUpdatesPerDay: number = 1,
-  toleranceMinutes: number = 60 // Allow execution within 60 minutes of scheduled time
+  _toleranceMinutes: number = 60 // Unused but kept for backward compatibility
 ): boolean {
-  const now = new Date();
-
-  // Get current time in the feed's timezone
-  const nowInFeedTZ = new Date(
-    now.toLocaleString('en-US', { timeZone: timezone })
-  );
-  
-  const currentHour = nowInFeedTZ.getHours();
-  const currentMinute = nowInFeedTZ.getMinutes();
-  const scheduledHours = getScheduledHours(maxUpdatesPerDay);
-
-  // Find if current time is within tolerance of any scheduled hour
-  const isScheduledHour = scheduledHours.some(hour => {
-    const scheduledMinutes = hour * 60;
-    const currentMinutes = currentHour * 60 + currentMinute;
-    const minutesDiff = Math.abs(currentMinutes - scheduledMinutes);
-    return minutesDiff <= toleranceMinutes;
-  });
-
-  if (!isScheduledHour) {
-    return false;
-  }
-
   // If never run before, run it now
   if (!lastRunAt) {
     return true;
   }
 
-  // Get last run time in the feed's timezone
-  const lastRunInFeedTZ = new Date(
-    lastRunAt.toLocaleString('en-US', { timeZone: timezone })
-  );
+  const now = new Date();
+  const scheduledHours = getScheduledHours(maxUpdatesPerDay);
 
-  // Calculate hours since last run
-  const hoursSinceLastRun = (nowInFeedTZ.getTime() - lastRunInFeedTZ.getTime()) / (1000 * 60 * 60);
-  
-  // Calculate minimum hours between updates
-  const minHoursBetweenUpdates = 24 / maxUpdatesPerDay;
-  
-  // Only regenerate if enough time has passed since last run
-  return hoursSinceLastRun >= (minHoursBetweenUpdates - 1); // -1 hour for tolerance
+  // We need to find the *most recent* scheduled time slot that has passed.
+  // If the last run was *before* this slot, then we are due for an update.
+
+  // 1. Get current time in the feed's timezone to determine the date references
+  const tzOptions = { timeZone: timezone, hour12: false, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' } as const;
+  const parts = new Intl.DateTimeFormat('en-US', tzOptions).formatToParts(now);
+  const part = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0');
+
+  const currentYear = part('year');
+  const currentMonth = part('month') - 1; // 0-indexed
+  const currentDay = part('day');
+  const currentHour = part('hour');
+
+  // 2. Identify candidate slots for today and yesterday
+  // We construct Date objects relative to the feed's timezone but represented in local server time for comparison?
+  // No, we should construct timestamps. 
+  // It's safer to work with ISO strings to avoid local server timezone confusion.
+
+  const getTimestampForSlot = (year: number, month: number, day: number, hour: number) => {
+    // Create a date object for this specific slot in the feed's timezone
+    // We use the string parsing behavior of Date which is reliable with explicit timezones in some envs, 
+    // but here we can rely on `toLocaleString` reverse logic or simpler:
+    // Create UTC date -> shift by offset? No, offset changes (DST).
+
+    // Most robust: Construct a string like "YYYY-MM-DDTHH:00:00" and append implicit offset? 
+    // No, standard JS Date doesn't support parsing with arbitrary IANA timezone.
+
+    // Hacky but effective way to get absolute timestamp for a timezone-relative time:
+    // 1. Guess UTC
+    // 2. Check simple offset
+    // 3. Adjust
+
+    // Better: We only need to know if "Now" is past "Slot".
+    // We know "Now" is `currentHour` on `currentDay`.
+
+    // Simple logic:
+    // Find the latest passed slot *in feed time*.
+    // Example: Now is 14:00. Schedule is [2, 14]. 
+    // Passed slots today: 2, 14.
+    // Latest passed slot: Today 14:00.
+
+    // Example: Now is 10:00. Schedule is [2, 14].
+    // Passed slots today: 2.
+    // Latest passed slot: Today 02:00.
+
+    // Example: Now is 01:00. Schedule is [2, 14].
+    // Passed slots today: None.
+    // Latest passed slot: Yesterday 14:00.
+
+    return { year, month, day, hour };
+  };
+
+  // Find latest passed slot
+  let latestPassedSlot: { year: number, month: number, day: number, hour: number } | null = null;
+
+  // Check today's slots
+  const passedToday = scheduledHours.filter(h => h <= currentHour).sort((a, b) => b - a);
+
+  if (passedToday.length > 0) {
+    latestPassedSlot = { year: currentYear, month: currentMonth, day: currentDay, hour: passedToday[0] };
+  } else {
+    // Check yesterday's slots (take the latest one)
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yParts = new Intl.DateTimeFormat('en-US', tzOptions).formatToParts(yesterday);
+    const yPart = (type: string) => parseInt(yParts.find(p => p.type === type)?.value || '0');
+
+    const sortedHours = [...scheduledHours].sort((a, b) => b - a);
+    if (sortedHours.length > 0) {
+      latestPassedSlot = {
+        year: yPart('year'),
+        month: yPart('month') - 1,
+        day: yPart('day'),
+        hour: sortedHours[0]
+      };
+    }
+  }
+
+  if (!latestPassedSlot) return true; // Should ideally have a slot if maxUpdates > 0
+
+  // 3. Now verify if lastRunAt was BEFORE this `latestPassedSlot`
+  // We need to compare specific points in time.
+  // Convert `lastRunAt` to feed's timezone components
+  const lParts = new Intl.DateTimeFormat('en-US', tzOptions).formatToParts(lastRunAt);
+  const lPart = (type: string) => parseInt(lParts.find(p => p.type === type)?.value || '0');
+
+  const lastRun = {
+    year: lPart('year'),
+    month: lPart('month') - 1,
+    day: lPart('day'),
+    hour: lPart('hour'),
+    minute: lPart('minute')
+  };
+
+  // Compare lexicographically: Year, Month, Day, Hour
+  // If LastRun < LatestPassedSlot, then REGENERATE
+
+  if (lastRun.year < latestPassedSlot.year) return true;
+  if (lastRun.year > latestPassedSlot.year) return false;
+
+  if (lastRun.month < latestPassedSlot.month) return true;
+  if (lastRun.month > latestPassedSlot.month) return false;
+
+  if (lastRun.day < latestPassedSlot.day) return true;
+  if (lastRun.day > latestPassedSlot.day) return false;
+
+  if (lastRun.hour < latestPassedSlot.hour) return true;
+
+  // If same hour, we assume it ran for this slot (checking minutes is overkill for hourly slots)
+  return false;
 }
 
 /**
@@ -145,7 +222,7 @@ export async function getFeedsDueForRegeneration(
       }
     }
   });
-  
+
   const results = [];
 
   for (const shop of shops) {
@@ -249,7 +326,7 @@ export async function regenerateDueFeeds(
         accessToken: shop.accessToken,
         triggeredBy: "scheduled"
       });
-      
+
       // Increment shop's update count for today
       shopUpdateCounts.set(shop.id, currentCount + 1);
       enqueuedFeeds++;
