@@ -8,18 +8,16 @@ import { authenticate } from "../../shopify.server";
  * - Testing billing flows
  */
 export async function shouldUseTestCharges(request: Request): Promise<boolean> {
+  // SECURITY: In development environment, always use test charges
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[billing] Test mode: ON (development environment)`);
+    return true;
+  }
+
+  // PRODUCTION ENVIRONMENT: Check if shop is a development store
   try {
     const { admin, session } = await authenticate.admin(request);
-
-    // Strictly disable test mode in production for non-dev stores
-    if (process.env.NODE_ENV === 'production') {
-      // We must check if it's a dev store before deciding
-      // If we can't determine, we default to false (safe for production billing)
-      console.log(`[billing] Production environment detected, checking shop type...`);
-    } else {
-      console.log(`[billing] Test mode: ON (development environment)`);
-      return true;
-    }
+    console.log(`[billing] Production environment detected, checking shop type...`);
 
     // Check if shop is a development store by querying ShopPlan
     const query = `
@@ -37,8 +35,10 @@ export async function shouldUseTestCharges(request: Request): Promise<boolean> {
 
     if (data.errors) {
       console.error('[billing] Error checking shop plan:', data.errors);
-      // Default to test mode for safety if we can't determine shop type
-      return true;
+      // SECURITY: In production, default to REAL charges if we can't determine
+      // This prevents exploitation by causing query failures
+      console.log('[billing] Test mode: OFF (error checking shop type - defaulting to production billing for security)');
+      return false;
     }
 
     const isDevStore = data.data?.shop?.plan?.partnerDevelopment || false;
@@ -54,9 +54,10 @@ export async function shouldUseTestCharges(request: Request): Promise<boolean> {
 
   } catch (error) {
     console.error('[billing] Error determining test mode:', error);
-    // Default to test mode for safety
-    console.log('[billing] Test mode: ON (error occurred, defaulting to safe mode)');
-    return true;
+    // SECURITY: In production environment, default to REAL charges on error
+    // This prevents users from exploiting errors to bypass billing
+    console.log('[billing] Test mode: OFF (error occurred in production - defaulting to production billing for security)');
+    return false;
   }
 }
 

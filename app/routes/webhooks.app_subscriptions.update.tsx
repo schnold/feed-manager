@@ -107,12 +107,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         where: { shopifySubscriptionId: subscription.admin_graphql_api_id },
       });
 
-      // CRITICAL: Webhook doesn't include "test" field!
-      // We need to check if shop is a development store, or check the subscription plan_handle
-      // For now, we'll check if it's a development store based on the shop domain
-      const isDevelopmentStore = shop.includes('myshopify.com');
-      // In production, real charges should have isTest=false unless it's a dev store
-      const isTest = isDevelopmentStore;
+      // SECURITY: Webhook doesn't include "test" field reliably
+      // Instead of guessing, preserve existing isTest value or default to the subscription's test field
+      // The primary source of truth is the subscription sync from GraphQL which has the correct test flag
+      let isTest = subscription.test ?? false;
+
+      // If subscription already exists in DB, preserve its isTest value (from GraphQL sync)
+      if (existingSubscription) {
+        isTest = existingSubscription.isTest;
+        console.log(`[webhook:app_subscriptions_update] Preserving existing isTest value: ${isTest}`);
+      }
 
       // CRITICAL: Log the exact values we're about to save
       const webhookDataToSave = {
