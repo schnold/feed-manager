@@ -109,14 +109,14 @@ export async function* iterateProductsWithStorefront(params: StorefrontIteratorP
       }
 
       const products = json.data?.products?.edges || [];
-      
+
       if (products.length === 0) {
         break;
       }
 
       for (const edge of products) {
         const product = edge.node;
-        
+
         // Transform the product to match our expected format
         const transformedProduct = {
           ...product,
@@ -157,7 +157,7 @@ export async function* iterateProductsWithStorefront(params: StorefrontIteratorP
       if (!pageInfo?.hasNextPage) {
         break;
       }
-      
+
       cursor = pageInfo.endCursor;
     } catch (error) {
       console.error('Error in Storefront product iterator:', error);
@@ -169,25 +169,33 @@ export async function* iterateProductsWithStorefront(params: StorefrontIteratorP
 /**
  * Get Storefront access token from environment or create one dynamically
  */
-export async function getStorefrontAccessToken(shopDomain: string, request?: Request): Promise<string> {
+export async function getStorefrontAccessToken(shopDomain: string, request?: Request, accessToken?: string): Promise<string> {
   // First, try environment variable
   const envToken = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN;
   if (envToken) {
     console.log(`[Storefront Token] Using token from environment variable`);
     return envToken;
   }
-  
-  // If no environment token and we have a request, try to create one dynamically
-  if (request) {
-    try {
-      const { getOrCreateStorefrontToken } = await import('../shopify/storefront-token.server');
+
+  try {
+    const { getOrCreateStorefrontToken, getOrCreateStorefrontTokenOffline } = await import('../shopify/storefront-token.server');
+
+    // If we have a request, use the standard remix way
+    if (request) {
       const token = await getOrCreateStorefrontToken(request);
-      console.log(`[Storefront Token] Created/retrieved token dynamically`);
+      console.log(`[Storefront Token] Created/retrieved token dynamically (web)`);
       return token;
-    } catch (error) {
-      console.warn(`[Storefront Token] Failed to create token dynamically:`, error);
     }
+
+    // If no request but we have accessToken (background job context), use offline way
+    if (accessToken) {
+      const token = await getOrCreateStorefrontTokenOffline(shopDomain, accessToken);
+      console.log(`[Storefront Token] Created/retrieved token dynamically (offline)`);
+      return token;
+    }
+  } catch (error) {
+    console.warn(`[Storefront Token] Failed to create token dynamically:`, error);
   }
-  
+
   throw new Error('Storefront access token not found. Please set SHOPIFY_STOREFRONT_ACCESS_TOKEN environment variable or ensure the app has proper permissions.');
 }

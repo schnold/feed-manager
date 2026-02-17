@@ -43,9 +43,9 @@ export async function generateGoogleXmlAndUpload({
 
   try {
     // Try Storefront API first (better for translations and localized pricing)
-    const storefrontAccessToken = await getStorefrontAccessToken(shopDomain, request);
+    const storefrontAccessToken = await getStorefrontAccessToken(shopDomain, request, accessToken);
     console.log(`[Feed Generation] Using Storefront API for translations and pricing`);
-    
+
     const iter = iterateProductsWithStorefront({
       shopDomain: shopDomain,
       storefrontAccessToken: storefrontAccessToken,
@@ -56,11 +56,11 @@ export async function generateGoogleXmlAndUpload({
     for await (const product of iter as any) {
       products.push(product);
     }
-    
+
     console.log(`[Feed Generation] Fetched ${products.length} products with Storefront API (includes translations and localized pricing)`);
   } catch (error) {
     console.warn(`[Feed Generation] Storefront API failed, falling back to Admin API:`, error);
-    
+
     // Fallback to Admin API
     const iter = iterateProducts({
       shopDomain: shopDomain,
@@ -89,7 +89,7 @@ export async function generateGoogleXmlAndUpload({
 
   for (const product of products) {
     let hasVariantsInFeed = false;
-    
+
     // Apply translations if available
     const translatedProduct = translations.get(product.id);
     if (translatedProduct) {
@@ -101,17 +101,17 @@ export async function generateGoogleXmlAndUpload({
         product.bodyHtml = translatedProduct.description;
       }
     }
-    
+
     // Handle both translated and regular product structures
     const variants = product.variants?.edges || product.variants || [];
-    
+
     for (const vEdge of variants) {
       const variant = vEdge.node || vEdge;
       if (!passesFilters(product, variant, feed.filters as any, "all")) continue;
-      
+
       hasVariantsInFeed = true;
       variantCount++;
-      
+
       // Apply variant translations if available
       if (translatedProduct) {
         const translatedVariant = translatedProduct.variants.find(v => v.id === variant.id);
@@ -119,7 +119,7 @@ export async function generateGoogleXmlAndUpload({
           variant.title = translatedVariant.title;
         }
       }
-      
+
       // Provide shop domain for link generation
       product.shopDomain = shopDomain;
 
@@ -162,7 +162,7 @@ export async function generateGoogleXmlAndUpload({
         `</item>`;
       items.push(node);
     }
-    
+
     if (hasVariantsInFeed) {
       productCount++;
     }
@@ -170,7 +170,7 @@ export async function generateGoogleXmlAndUpload({
 
   // Generate language-specific channel title
   const channelTitle = generateChannelTitle(feed.name, feed.language, feed.country);
-  
+
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">\n` +
@@ -347,13 +347,13 @@ function generateChannelTitle(feedName: string, language: string, country: strin
   };
 
   const countryName = countryNames[country] || country;
-  
+
   // If the feed name already contains the country, don't duplicate it
-  if (feedName.toLowerCase().includes(countryName.toLowerCase()) || 
-      feedName.toLowerCase().includes(country.toLowerCase())) {
+  if (feedName.toLowerCase().includes(countryName.toLowerCase()) ||
+    feedName.toLowerCase().includes(country.toLowerCase())) {
     return feedName;
   }
-  
+
   // Add country to the feed name for better identification
   return `${feedName} - ${countryName}`;
 }

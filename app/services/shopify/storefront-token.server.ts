@@ -17,20 +17,20 @@ export interface StorefrontToken {
  */
 export async function getOrCreateStorefrontToken(request: Request): Promise<string> {
   const { admin } = await authenticate.admin(request);
-  
+
   try {
     // First, try to get existing tokens
     const existingTokens = await getExistingStorefrontTokens(admin);
-    
+
     if (existingTokens.length > 0) {
       console.log(`[Storefront Token] Found ${existingTokens.length} existing tokens, using the first one`);
       return existingTokens[0].accessToken;
     }
-    
+
     // If no existing tokens, create a new one
     console.log(`[Storefront Token] No existing tokens found, creating a new one`);
     return await createStorefrontToken(admin);
-    
+
   } catch (error) {
     console.error(`[Storefront Token] Error getting/creating token:`, error);
     throw error;
@@ -115,7 +115,7 @@ async function createStorefrontToken(admin: any): Promise<string> {
   }
 
   const result = json.data?.storefrontAccessTokenCreate;
-  
+
   if (result.userErrors && result.userErrors.length > 0) {
     throw new Error(`Failed to create storefront token: ${JSON.stringify(result.userErrors)}`);
   }
@@ -126,6 +126,53 @@ async function createStorefrontToken(admin: any): Promise<string> {
 
   console.log(`[Storefront Token] Created new token: ${result.storefrontAccessToken.title}`);
   return result.storefrontAccessToken.accessToken;
+}
+
+export async function getOrCreateStorefrontTokenOffline(shopDomain: string, accessToken: string): Promise<string> {
+  // Use dynamic import to avoid circular dependencies if any, though shopify.server is usually safe
+  const { default: shopify } = await import("../../shopify.server");
+
+  const session = {
+    shop: shopDomain,
+    accessToken: accessToken,
+  };
+
+  // Create a new GraphQL client for the session
+  const client = new shopify.api.clients.Graphql({ session: session as any });
+
+  // Create an adapter that matches the admin.graphql interface used by helper functions
+  const adminAdapter = {
+    graphql: async (query: string, options: any = {}) => {
+      const response = await client.query({
+        data: {
+          query,
+          variables: options.variables,
+        },
+      });
+
+      return {
+        json: async () => response.body,
+      };
+    }
+  };
+
+  try {
+    // First, try to get existing tokens
+    const existingTokens = await getExistingStorefrontTokens(adminAdapter);
+
+    if (existingTokens.length > 0) {
+      console.log(`[Storefront Token] Found ${existingTokens.length} existing tokens (offline), using the first one`);
+      return existingTokens[0].accessToken;
+    }
+
+    // If no existing tokens, create a new one
+    console.log(`[Storefront Token] No existing tokens found (offline), creating a new one`);
+    return await createStorefrontToken(adminAdapter);
+
+  } catch (error) {
+    console.error(`[Storefront Token] Error getting/creating token offline:`, error);
+    throw error;
+  }
 }
 
 /**
