@@ -13,7 +13,8 @@ export async function* iterateProductsWithStorefront(params: StorefrontIteratorP
   const { shopDomain, storefrontAccessToken, language, country } = params;
 
   let cursor: string | null = null;
-  const pageSize = 50;
+  // Increase page size to 250 (max allowed) to reduce round trips and prevent timeouts
+  const pageSize = 250;
 
   // Convert language code to Storefront API format
   const languageCode = language.toUpperCase();

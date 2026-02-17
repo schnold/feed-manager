@@ -129,29 +129,34 @@ async function createStorefrontToken(admin: any): Promise<string> {
 }
 
 export async function getOrCreateStorefrontTokenOffline(shopDomain: string, accessToken: string): Promise<string> {
-  // Use dynamic import to avoid circular dependencies if any, though shopify.server is usually safe
-  const { default: shopify } = await import("../../shopify.server");
-
-  const session = {
-    shop: shopDomain,
-    accessToken: accessToken,
-  };
-
-  // Create a new GraphQL client for the session
-  const client = new shopify.api.clients.Graphql({ session: session as any });
+  // Use direct fetch to avoid dependency issues with the shopify object in background/offline contexts
+  // We matched the ApiVersion.April25 from shopify.server.ts
+  const apiVersion = "2025-04";
+  const url = `https://${shopDomain}/admin/api/${apiVersion}/graphql.json`;
 
   // Create an adapter that matches the admin.graphql interface used by helper functions
   const adminAdapter = {
     graphql: async (query: string, options: any = {}) => {
-      const response = await client.query({
-        data: {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": accessToken,
+        },
+        body: JSON.stringify({
           query,
           variables: options.variables,
-        },
+        }),
       });
 
+      if (!response.ok) {
+        throw new Error(`Admin API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const body = await response.json();
+
       return {
-        json: async () => response.body,
+        json: async () => body,
       };
     }
   };

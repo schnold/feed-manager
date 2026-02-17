@@ -167,7 +167,7 @@ if (redisQueue) {
         removeOnFail: 5
       }
     });
-    
+
     // Handle queue errors gracefully
     feedGenerationQueue.on('error', (error) => {
       if (!isServerless) {
@@ -212,7 +212,11 @@ export async function enqueueFeedGeneration(data: FeedGenerationJob) {
   };
 
   if (!feedGenerationQueue) {
-    return processSynchronously();
+    // Fire and forget - don't await the result to avoid timeout
+    processSynchronously().catch(err => {
+      console.error('Unhandled error in background feed generation:', err);
+    });
+    return;
   }
 
   // Try to enqueue, but fall back to synchronous processing if Redis fails
@@ -230,7 +234,13 @@ export async function enqueueFeedGeneration(data: FeedGenerationJob) {
     );
   } catch (error) {
     console.warn(`Failed to enqueue feed generation (${error instanceof Error ? error.message : 'Unknown error'}). Falling back to synchronous processing.`);
-    return processSynchronously();
+    // Fire and forget - don't await the result to avoid timeout
+    // In serverless environments, this might be terminated early, but it's the only way to return a response quickly
+    // without an external queue. The fast generation (via pageSize=250 and offline token) should allow it to complete.
+    processSynchronously().catch(err => {
+      console.error('Unhandled error in background feed generation:', err);
+    });
+    return;
   }
 }
 
