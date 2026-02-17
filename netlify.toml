@@ -52,3 +52,10 @@
 # "0 * * * *" = Every hour at the top of the hour
 [functions."scheduled-feed-regeneration"]
   schedule = "0 * * * *"
+
+# Queue processor function
+# Processes pending jobs from the Redis queue
+# Runs every 5 minutes to process feed generation jobs
+# "*/5 * * * *" = Every 5 minutes
+[functions."process-queue"]
+  schedule = "*/5 * * * *"

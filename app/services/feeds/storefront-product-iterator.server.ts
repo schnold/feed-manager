@@ -86,7 +86,7 @@ export async function* iterateProductsWithStorefront(params: StorefrontIteratorP
 
     try {
       // Make direct GraphQL request to Shopify Storefront API
-      const response = await fetch(`https://${shopDomain}/api/2025-04/graphql.json`, {
+      const storefrontResponse: Response = await fetch(`https://${shopDomain}/api/2025-04/graphql.json`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -98,11 +98,11 @@ export async function* iterateProductsWithStorefront(params: StorefrontIteratorP
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Storefront API request failed: ${response.status} ${response.statusText}`);
+      if (!storefrontResponse.ok) {
+        throw new Error(`Storefront API request failed: ${storefrontResponse.status} ${storefrontResponse.statusText}`);
       }
 
-      const json = await response.json();
+      const json = await storefrontResponse.json();
 
       if (json.errors) {
         console.error('Storefront API GraphQL errors:', json.errors);

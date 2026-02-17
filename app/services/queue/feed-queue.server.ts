@@ -21,21 +21,19 @@ const isServerless = !!(
 if (process.env.REDIS_URL && !isServerless) {
   try {
     // Connection for Queue - can use maxRetriesPerRequest: 3
-    redisQueue = new Redis(process.env.REDIS_URL, {
+    redisQueue = new Redis(process.env.REDIS_URL as string, {
       maxRetriesPerRequest: 3,
-      retryDelayOnFailover: 100,
       enableReadyCheck: false,
-      lazyConnect: true,
+      lazyConnect: false, // Connect immediately
       connectTimeout: 5000,
       retryStrategy: () => null, // Disable automatic retries
     });
 
     // Connection for Worker - must use maxRetriesPerRequest: null for blocking operations
-    redisWorker = new Redis(process.env.REDIS_URL, {
+    redisWorker = new Redis(process.env.REDIS_URL as string, {
       maxRetriesPerRequest: null, // Required for BullMQ Workers
-      retryDelayOnFailover: 100,
       enableReadyCheck: false,
-      lazyConnect: true,
+      lazyConnect: false, // Connect immediately
       connectTimeout: 5000,
       retryStrategy: () => null, // Disable automatic retries
     });
@@ -45,18 +43,17 @@ if (process.env.REDIS_URL && !isServerless) {
     redisWorker = null;
   }
 } else if (process.env.REDIS_URL && isServerless) {
-  // In serverless, we still create the queue connection but don't connect immediately
+  // In serverless, we still create the queue connection and connect immediately
   // This allows queue operations to work if Redis is available
   try {
-    redisQueue = new Redis(process.env.REDIS_URL, {
+    redisQueue = new Redis(process.env.REDIS_URL as string, {
       maxRetriesPerRequest: 3,
-      retryDelayOnFailover: 100,
       enableReadyCheck: false,
-      lazyConnect: true,
+      lazyConnect: false, // Connect immediately in serverless
       connectTimeout: 3000, // Shorter timeout for serverless
       retryStrategy: () => null, // Disable automatic retries
       // Don't auto-reconnect in serverless - let it fail gracefully
-      reconnectOnError: false,
+      reconnectOnError: () => false,
     });
   } catch (error) {
     console.warn('Failed to create Redis connection in serverless:', error);
@@ -95,9 +92,11 @@ if (redisQueue) {
       console.log('Redis queue ready');
       // Check eviction policy
       try {
-        const policy = await redisQueue!.config('GET', 'maxmemory-policy');
-        if (policy && policy[1] !== 'noeviction') {
-          console.warn(`⚠️  Redis eviction policy is "${policy[1]}". For optimal BullMQ performance, it should be "noeviction".`);
+        const policy = await redisQueue!.config('GET', 'maxmemory-policy') as string[] | Record<string, string>;
+        const policyValue = Array.isArray(policy) ? policy[1] : (policy as Record<string, string>)['maxmemory-policy'];
+
+        if (policyValue && policyValue !== 'noeviction') {
+          console.warn(`⚠️  Redis eviction policy is "${policyValue}". For optimal BullMQ performance, it should be "noeviction".`);
           console.warn('   This may cause job data to be evicted under memory pressure.');
         }
       } catch (error) {
