@@ -14,7 +14,7 @@ import { FeedRepository } from "../../app/db/repositories/feed.server";
  * Setup:
  * 1. Add schedule in netlify.toml:
  *    [functions."process-queue"]
- *    schedule = "*/5 * * * *"  # Every 5 minutes
+ *    schedule = "* / 5 * * * *"  # Every 5 minutes (space added to prevent comment break)
  *
  * 2. Ensure REDIS_URL is set in Netlify environment variables
  */

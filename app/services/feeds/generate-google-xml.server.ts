@@ -5,7 +5,7 @@ import { iterateProductsWithStorefront, getStorefrontAccessToken } from "./store
 import { defaultGoogleMapping } from "./mapping.server";
 import { passesFilters } from "./filters.server";
 import { getCurrencyForCountry } from "../currency/currency-converter.server";
-import { fetchTranslatedProductsAdmin } from "./translation-fetcher.server";
+import { fetchTranslatedProductsAdmin, type TranslatedProduct } from "./translation-fetcher.server";
 
 type GenerateOptions = {
   feedId: string;
@@ -39,7 +39,7 @@ export async function generateGoogleXmlAndUpload({
 
   // Fetch all products using the best available API
   let products: any[] = [];
-  let translations = new Map();
+  let translations: Map<string, TranslatedProduct> = new Map();
 
   try {
     // Try Storefront API first (better for translations and localized pricing)
