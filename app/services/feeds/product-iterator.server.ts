@@ -9,7 +9,7 @@ export async function* iterateProducts(params: IteratorParams) {
   const { shopDomain, accessToken, country } = params;
 
   let cursor: string | null = null;
-  const pageSize = 50;
+  const pageSize = 250; // Increased from 50 to 250 to reduce round-trips and prevent timeouts
 
   while (true) {
     const query = `

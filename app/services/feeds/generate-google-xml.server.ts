@@ -61,29 +61,39 @@ export async function generateGoogleXmlAndUpload({
   } catch (error) {
     console.warn(`[Feed Generation] Storefront API failed, falling back to Admin API:`, error);
 
-    // Fallback to Admin API
-    const iter = iterateProducts({
-      shopDomain: shopDomain,
-      accessToken: accessToken,
-      language: feed.language,
-      country: feed.country,
-    });
+    try {
+      // Fallback to Admin API
+      const iter = iterateProducts({
+        shopDomain: shopDomain,
+        accessToken: accessToken,
+        language: feed.language,
+        country: feed.country,
+      });
 
-    for await (const product of iter as any) {
-      products.push(product);
-    }
+      for await (const product of iter as any) {
+        products.push(product);
+        if (products.length % 500 === 0) {
+          console.log(`[Feed Generation] Admin API fallback progress: ${products.length} products fetched...`);
+        }
+      }
 
-    // Fetch translations if language is not English (Admin API approach)
-    if (feed.language !== 'en') {
-      console.log(`[Feed Generation] Fetching translations for language: ${feed.language}`);
-      const productIds = products.map(p => p.id);
-      translations = await fetchTranslatedProductsAdmin(
-        shopDomain,
-        accessToken,
-        feed.language,
-        productIds
-      );
-      console.log(`[Feed Generation] Fetched ${translations.size} product translations`);
+      console.log(`[Feed Generation] Successfully fetched ${products.length} products total via Admin API fallback`);
+
+      // Fetch translations if language is not English (Admin API approach)
+      if (feed.language !== 'en' && products.length > 0) {
+        console.log(`[Feed Generation] Fetching translations for language: ${feed.language}`);
+        const productIds = products.map(p => p.id);
+        translations = await fetchTranslatedProductsAdmin(
+          shopDomain,
+          accessToken,
+          feed.language,
+          productIds
+        );
+        console.log(`[Feed Generation] Fetched ${translations.size} product translations`);
+      }
+    } catch (fallbackError) {
+      console.error(`[Feed Generation] Admin API fallback also failed:`, fallbackError);
+      throw fallbackError; // Re-throw to be caught by the queue processor
     }
   }
 

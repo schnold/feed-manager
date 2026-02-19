@@ -92,6 +92,14 @@ const handler: Handler = async () => {
 
         console.log(`[Queue Processor] Processing feed ${feedId} (triggered by: ${triggeredBy})`);
 
+        // Check if feed still exists to avoid Prisma RecordNotFound error
+        const feed = await FeedRepository.findById(feedId);
+        if (!feed) {
+          console.warn(`[Queue Processor] Feed ${feedId} no longer exists. Skipping and removing job.`);
+          await job.remove();
+          continue;
+        }
+
         // Update status to running
         await FeedRepository.updateStatus(feedId, "running", new Date());
 

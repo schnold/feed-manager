@@ -40,7 +40,6 @@ export async function* iterateProductsWithStorefront(params: StorefrontIteratorP
               handle
               productType
               vendor
-              status
               featuredImage { 
                 url
                 altText
