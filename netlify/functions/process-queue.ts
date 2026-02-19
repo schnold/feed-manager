@@ -1,5 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import { Queue, Worker, type Job } from "bullmq";
+import { Queue } from "bullmq";
 import Redis from "ioredis";
 import { generateGoogleXML } from "../../app/services/feeds/generate-google-xml.server";
 import { FeedRepository } from "../../app/db/repositories/feed.server";
@@ -44,11 +44,24 @@ const handler: Handler = async () => {
   const failedJobs: string[] = [];
 
   try {
-    // Create Redis connection
-    redisConnection = new Redis(process.env.REDIS_URL, {
+    // Create Redis connection with TLS support
+    const redisOptions: any = {
       maxRetriesPerRequest: 3,
       enableReadyCheck: false,
       connectTimeout: 5000,
+    };
+
+    if (process.env.REDIS_URL.startsWith('rediss://')) {
+      redisOptions.tls = {
+        rejectUnauthorized: false
+      };
+    }
+
+    redisConnection = new Redis(process.env.REDIS_URL, redisOptions);
+
+    // Add error listener to catch async connection issues
+    redisConnection.on('error', (err) => {
+      console.warn("[Queue Processor] Redis connection error:", err.message);
     });
 
     // Create queue instance

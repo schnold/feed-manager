@@ -18,24 +18,32 @@ const isServerless = !!(
   (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL)
 );
 
+const redisOptions: any = {
+  maxRetriesPerRequest: 3,
+  enableReadyCheck: false,
+  lazyConnect: false,
+  connectTimeout: isServerless ? 3000 : 5000,
+  retryStrategy: () => null,
+  reconnectOnError: () => false,
+};
+
+// Enable TLS for rediss:// URLs (required for Upstash and some others)
+if (process.env.REDIS_URL?.startsWith('rediss://')) {
+  redisOptions.tls = {
+    rejectUnauthorized: false // Often needed for serverless environments
+  };
+}
+
 if (process.env.REDIS_URL && !isServerless) {
   try {
-    // Connection for Queue - can use maxRetriesPerRequest: 3
-    redisQueue = new Redis(process.env.REDIS_URL as string, {
-      maxRetriesPerRequest: 3,
-      enableReadyCheck: false,
-      lazyConnect: false, // Connect immediately
-      connectTimeout: 5000,
-      retryStrategy: () => null, // Disable automatic retries
-    });
+    // Connection for Queue
+    redisQueue = new Redis(process.env.REDIS_URL as string, redisOptions);
 
-    // Connection for Worker - must use maxRetriesPerRequest: null for blocking operations
+    // Connection for Worker - must use maxRetriesPerRequest: null
     redisWorker = new Redis(process.env.REDIS_URL as string, {
-      maxRetriesPerRequest: null, // Required for BullMQ Workers
-      enableReadyCheck: false,
-      lazyConnect: false, // Connect immediately
+      ...redisOptions,
+      maxRetriesPerRequest: null,
       connectTimeout: 5000,
-      retryStrategy: () => null, // Disable automatic retries
     });
   } catch (error) {
     console.warn('Failed to create Redis connection:', error);
@@ -43,18 +51,8 @@ if (process.env.REDIS_URL && !isServerless) {
     redisWorker = null;
   }
 } else if (process.env.REDIS_URL && isServerless) {
-  // In serverless, we still create the queue connection and connect immediately
-  // This allows queue operations to work if Redis is available
   try {
-    redisQueue = new Redis(process.env.REDIS_URL as string, {
-      maxRetriesPerRequest: 3,
-      enableReadyCheck: false,
-      lazyConnect: false, // Connect immediately in serverless
-      connectTimeout: 3000, // Shorter timeout for serverless
-      retryStrategy: () => null, // Disable automatic retries
-      // Don't auto-reconnect in serverless - let it fail gracefully
-      reconnectOnError: () => false,
-    });
+    redisQueue = new Redis(process.env.REDIS_URL as string, redisOptions);
   } catch (error) {
     console.warn('Failed to create Redis connection in serverless:', error);
     redisQueue = null;
