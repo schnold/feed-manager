@@ -87,12 +87,12 @@ const handler: Handler = async () => {
 
     // Process each job
     for (const job of waitingJobs) {
-      try {
-        const { feedId, shopDomain, accessToken, triggeredBy } = job.data;
+      const { feedId, shopDomain, accessToken, triggeredBy } = job.data;
 
+      try {
         console.log(`[Queue Processor] Processing feed ${feedId} (triggered by: ${triggeredBy})`);
 
-        // Check if feed still exists to avoid Prisma RecordNotFound error
+        // Check if feed still exists before even starting
         const feed = await FeedRepository.findById(feedId);
         if (!feed) {
           console.warn(`[Queue Processor] Feed ${feedId} no longer exists. Skipping and removing job.`);
@@ -100,23 +100,12 @@ const handler: Handler = async () => {
           continue;
         }
 
-        // Update status to running
-        await FeedRepository.updateStatus(feedId, "running", new Date());
-
-        // Generate the feed
+        // Generate the feed - handles its own status updates to success/error
         await generateGoogleXML({
           feedId,
           shopDomain,
           accessToken
         });
-
-        // Update status to success
-        await FeedRepository.updateStatus(
-          feedId,
-          "success",
-          new Date(),
-          new Date()
-        );
 
         // Mark job as completed
         await job.moveToCompleted("success", job.token || "0");
@@ -127,24 +116,15 @@ const handler: Handler = async () => {
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
         console.error(`[Queue Processor] Failed to process job ${job.id}:`, errorMessage);
 
         try {
-          const { feedId } = job.data;
-          await FeedRepository.updateStatus(
-            feedId,
-            "error",
-            new Date(),
-            undefined,
-            errorMessage
-          );
-
-          // Move job to failed
+          // If generateGoogleXML failed, it already updated the status to 'error'.
+          // Here we just handle the BullMQ job lifecycle.
           await job.moveToFailed(new Error(errorMessage), job.token || "0");
           failedJobs.push(feedId);
-        } catch (updateError) {
-          console.error(`Failed to update job status:`, updateError);
+        } catch (jobError) {
+          console.error(`[Queue Processor] Failed to move job to failed:`, jobError);
         }
       }
     }

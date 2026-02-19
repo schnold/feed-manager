@@ -33,6 +33,12 @@ export async function generateGoogleXmlAndUpload({
 
   console.log(`[Feed Generation] Found feed: ${feed.name} (${feed.language}-${feed.country})`);
 
+  // Update status to running
+  await db.feed.update({
+    where: { id: feedId },
+    data: { status: "running", lastRunAt: new Date() }
+  });
+
   const items: string[] = [];
   let productCount = 0;
   let variantCount = 0;
@@ -192,29 +198,58 @@ export async function generateGoogleXmlAndUpload({
     `\n</channel>\n` +
     `</rss>`;
 
-  const key = `${feed.shopId}/${feed.id}.xml`;
-  console.log(`[Feed Generation] Uploading XML to S3: ${key}`);
+  try {
+    const key = `${feed.shopId}/${feed.id}.xml`;
+    console.log(`[Feed Generation] Uploading XML to S3: ${key}`);
 
-  const publicUrl = await uploadXmlToS3({ key, body: xml, contentType: "application/xml; charset=utf-8" });
+    const publicUrl = await uploadXmlToS3({ key, body: xml, contentType: "application/xml; charset=utf-8" });
 
-  console.log(`[Feed Generation] Upload complete. Public URL: ${publicUrl}`);
-  console.log(`[Feed Generation] Feed contains ${productCount} products and ${variantCount} variants`);
+    console.log(`[Feed Generation] Upload complete. Public URL: ${publicUrl}`);
+    console.log(`[Feed Generation] Feed contains ${productCount} products and ${variantCount} variants`);
 
-  await db.feed.update({
-    where: { id: feed.id },
-    data: {
-      publicPath: key,
-      publicUrl,
-      lastSuccessAt: new Date(),
-      status: "success",
-      productCount,
-      variantCount
-    },
-  });
+    // Only update if feed still exists to avoid P2025 during the final milliseconds
+    try {
+      await db.feed.update({
+        where: { id: feed.id },
+        data: {
+          publicPath: key,
+          publicUrl,
+          lastSuccessAt: new Date(),
+          lastRunAt: new Date(),
+          status: "success",
+          productCount,
+          variantCount,
+          lastError: null
+        },
+      });
+      console.log(`[Feed Generation] Feed ${feedId} generation completed successfully`);
+    } catch (updateError) {
+      if ((updateError as any).code === 'P2025') {
+        console.warn(`[Feed Generation] Feed ${feedId} was deleted during generation. Skipping final status update.`);
+      } else {
+        throw updateError;
+      }
+    }
 
-  console.log(`[Feed Generation] Feed ${feedId} generation completed successfully`);
+    return { key, publicUrl, productCount, variantCount };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`[Feed Generation] Failed to complete generation for feed ${feedId}:`, errorMessage);
 
-  return { key, publicUrl, productCount, variantCount };
+    try {
+      await db.feed.update({
+        where: { id: feedId },
+        data: {
+          status: "error",
+          lastError: errorMessage,
+          lastRunAt: new Date()
+        }
+      });
+    } catch (e) {
+      // Ignore errors updating status if the feed record is already gone
+    }
+    throw error;
+  }
 }
 
 // Alias export for worker
